@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { initialData } from '../data/initialData';
 import { makeId, nowISO } from '../utils/formatters';
+import { getCustomers } from '../api/parties';
 
 const STORAGE_KEY = 'nexus-erp-state-v1';
 const ERPContext = createContext(null);
@@ -20,7 +21,35 @@ export function ERPProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
-
+  useEffect(() => {
+    async function loadCustomers() {
+      try {
+        const apiCustomers = await getCustomers();
+  
+        const customers = apiCustomers.map((customer) => ({
+          id: customer.id,
+          name: customer.full_name,
+          phone: customer.phone,
+          instagram: customer.instagram_handle,
+          postalCode: customer.postal_code,
+          address: customer.address,
+  
+          // فعلاً تا زمانی که Sales/Receivables به API وصل شوند
+          totalPurchases: 0,
+          debt: 0,
+        }));
+  
+        setData((prev) => ({
+          ...prev,
+          customers,
+        }));
+      } catch (error) {
+        console.error('Failed to load customers from Django API:', error);
+      }
+    }
+  
+    loadCustomers();
+  }, []);
   const addProduct = (payload) => {
     const normalizedSku = payload.sku.trim().toUpperCase();
     if (!payload.name.trim()) return { ok: false, message: 'نام کالا الزامی است.' };
