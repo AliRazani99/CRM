@@ -1,0 +1,87 @@
+### ==========================================
+### 1. FINANCE API TESTS
+### ==========================================
+
+### 1.1 Create a Financial Account
+POST http://127.0.0.1:8000/api/finance/accounts/
+Content-Type: application/json
+
+{
+  "name": "Main Bank Account - Pasargad",
+  "account_type": "BANK",
+  "currency_code": "IRR",
+  "current_balance": "500000000.00",
+  "is_active": true
+}
+
+### 1.2 Get all Financial Accounts
+GET http://127.0.0.1:8000/api/finance/accounts/
+
+### 1.3 Record an Account Transaction
+POST http://127.0.0.1:8000/api/finance/transactions/
+Content-Type: application/json
+
+{
+  "account": 1,
+  "transaction_date": "2026-08-14",
+  "transaction_type": "INITIAL_DEPOSIT",
+  "direction": "IN",
+  "amount": "500000000.00",
+  "currency_code": "IRR",
+  "description": "Opening balance"
+}
+
+### ==========================================
+### 2. SALES API TESTS
+### ==========================================
+
+### 2.1 Create a Sale (Ensure user with ID 1 exists)
+POST http://127.0.0.1:8000/api/sales/sales/
+Content-Type: application/json
+
+{
+  "invoice_number": "INV-2026-0001",
+  "customer": 1,
+  "sale_date": "2026-08-14",
+  "total_amount": "1500000.00",
+  "total_paid": "500000.00",
+  "total_debt": "1000000.00",
+  "settlement_status": "PARTIAL",
+  "notes": "First customer order",
+  "created_by_user": 1
+}
+
+### 2.2 Get all Sales
+GET http://127.0.0.1:8000/api/sales/sales/
+
+### 2.3 Record a Payment for the Sale
+POST http://127.0.0.1:8000/api/sales/payments/
+Content-Type: application/json
+
+{
+  "sale": 1,
+  "customer": 1,
+  "account": 1,
+  "payment_date": "2026-08-14",
+  "amount": "500000.00",
+  "currency_code": "IRR",
+  "payment_method": "POS_TRANSFER",
+  "notes": "Partial payment receipt"
+}
+
+### 2.4 Create Customer Receivable
+POST http://127.0.0.1:8000/api/sales/receivables/
+Content-Type: application/json
+
+{
+  "customer": 1,
+  "sale": 1,
+  "original_amount": "1500000.00",
+  "paid_amount": "500000.00",
+  "remaining_amount": "1000000.00",
+  "status": "PARTIAL",
+  "due_date": "2026-09-14"
+}
+
+### 2.5 Get all Receivables
+GET http://127.0.0.1:8000/api/sales/receivables/
