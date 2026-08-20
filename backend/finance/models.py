@@ -17,7 +17,8 @@ class CurrencyExchange(models.Model):
 
     def __str__(self):
         return f"Exchange {self.id}: {self.from_amount} {self.from_currency_code} -> {self.to_amount} {self.to_currency_code}"
-
+    class Meta:
+        db_table = "currency_exchanges"
 
 class AccountTransaction(models.Model):
     DIRECTION_CHOICES = [
@@ -43,3 +44,5 @@ class AccountTransaction(models.Model):
 
     def __str__(self):
         return f"{self.transaction_type} ({self.direction}) - {self.amount} {self.currency_code}"
+    class Meta:
+        db_table = "account_transactions"
