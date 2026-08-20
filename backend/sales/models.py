@@ -61,7 +61,7 @@ class Payment(models.Model):
     account = models.ForeignKey('parties.FinancialAccount', on_delete=models.PROTECT, related_name="sale_payments")
     payment_date = models.DateField()
     amount = models.DecimalField(max_digits=18, decimal_places=2)
-    currency_code = models.CharField(max_length=10)
+    currency_code = models.CharField(max_length=3)
     payment_method = models.CharField(max_length=50)
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
