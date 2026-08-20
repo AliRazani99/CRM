@@ -22,10 +22,13 @@ export default function SuppliersPage() {
   const selected = suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? filtered[0];
   const supplierPurchases = selected ? purchases.filter((purchase) => purchase.supplierId === selected.id) : [];
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
-    const response = addSupplier(form);
+  
+    const response = await addSupplier(form);
+  
     setResult(response);
+  
     if (response.ok) {
       setForm(blankSupplier);
       setTimeout(() => setModalOpen(false), 500);

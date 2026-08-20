@@ -1,12 +1,29 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { initialData } from '../data/initialData';
 import { makeId, nowISO } from '../utils/formatters';
-import { getCustomers } from '../api/parties';
+import {
+  createCustomer,
+  createSupplier,
+  getCustomers,
+  getSuppliers,
+} from '../api/parties';
 
 const STORAGE_KEY = 'nexus-erp-state-v1';
 const ERPContext = createContext(null);
 
 const cloneInitialData = () => JSON.parse(JSON.stringify(initialData));
+
+const mapSupplierFromApi = (supplier) => ({
+  id: supplier.id,
+  name: supplier.name,
+  country: supplier.country,
+  phone: supplier.phone,
+  email: supplier.email,
+  isActive: supplier.is_active,
+
+  purchaseCount: 0,
+  totalPurchaseCAD: 0,
+});
 
 export function ERPProvider({ children }) {
   const [data, setData] = useState(() => {
@@ -50,6 +67,27 @@ export function ERPProvider({ children }) {
   
     loadCustomers();
   }, []);
+  useEffect(() => {
+    async function loadSuppliers() {
+      try {
+        const apiSuppliers = await getSuppliers();
+  
+        const suppliers = apiSuppliers.map(mapSupplierFromApi);
+  
+        setData((prev) => ({
+          ...prev,
+          suppliers,
+        }));
+      } catch (error) {
+        console.error(
+          'Failed to load suppliers from Django API:',
+          error,
+        );
+      }
+    }
+  
+    loadSuppliers();
+  }, []);
   const addProduct = (payload) => {
     const normalizedSku = payload.sku.trim().toUpperCase();
     if (!payload.name.trim()) return { ok: false, message: 'نام کالا الزامی است.' };
@@ -76,43 +114,97 @@ export function ERPProvider({ children }) {
     return { ok: true, message: 'کالا با موفقیت ثبت شد.' };
   };
 
-  const addCustomer = (payload) => {
+  const addCustomer = async (payload) => {
     if (!payload.name.trim() || !payload.phone.trim()) {
-      return { ok: false, message: 'نام و شماره تماس مشتری الزامی است.' };
+      return {
+        ok: false,
+        message: 'نام و شماره تماس مشتری الزامی است.',
+      };
     }
-    if (data.customers.some((customer) => customer.phone === payload.phone.trim())) {
-      return { ok: false, message: 'مشتری دیگری با این شماره تماس وجود دارد.' };
+  
+    if (
+      data.customers.some(
+        (customer) => customer.phone === payload.phone.trim(),
+      )
+    ) {
+      return {
+        ok: false,
+        message: 'مشتری دیگری با این شماره تماس وجود دارد.',
+      };
     }
-
-    const customer = {
-      id: Date.now(),
-      name: payload.name.trim(),
-      phone: payload.phone.trim(),
-      instagram: payload.instagram.trim(),
-      postalCode: payload.postalCode.trim(),
-      address: payload.address.trim(),
-      totalPurchases: 0,
-      debt: 0,
-    };
-    setData((prev) => ({ ...prev, customers: [customer, ...prev.customers] }));
-    return { ok: true, message: 'مشتری جدید ثبت شد.' };
+  
+    try {
+      const apiCustomer = await createCustomer(payload);
+  
+      const customer = {
+        id: apiCustomer.id,
+        name: apiCustomer.full_name,
+        phone: apiCustomer.phone,
+        instagram: apiCustomer.instagram_handle,
+        postalCode: apiCustomer.postal_code,
+        address: apiCustomer.address,
+  
+        // فعلاً تا اتصال Sales و Receivables
+        totalPurchases: 0,
+        debt: 0,
+      };
+  
+      setData((prev) => ({
+        ...prev,
+        customers: [customer, ...prev.customers],
+      }));
+  
+      return {
+        ok: true,
+        message: 'مشتری جدید با موفقیت ثبت شد.',
+      };
+    } catch (error) {
+      console.error(
+        'Failed to create customer in Django API:',
+        error,
+      );
+  
+      return {
+        ok: false,
+        message: 'ثبت مشتری در سرور انجام نشد.',
+      };
+    }
   };
 
-  const addSupplier = (payload) => {
-    if (!payload.name.trim()) return { ok: false, message: 'نام تأمین‌کننده الزامی است.' };
-    const supplier = {
-      id: Date.now(),
-      name: payload.name.trim(),
-      country: payload.country.trim(),
-      phone: payload.phone.trim(),
-      email: payload.email.trim(),
-      purchaseCount: 0,
-      totalPurchaseCAD: 0,
-    };
-    setData((prev) => ({ ...prev, suppliers: [supplier, ...prev.suppliers] }));
-    return { ok: true, message: 'تأمین‌کننده ثبت شد.' };
+  const addSupplier = async (payload) => {
+    if (!payload.name.trim()) {
+      return {
+        ok: false,
+        message: 'نام تأمین‌کننده الزامی است.',
+      };
+    }
+  
+    try {
+      const createdSupplier = await createSupplier(payload);
+  
+      const supplier = mapSupplierFromApi(createdSupplier);
+  
+      setData((prev) => ({
+        ...prev,
+        suppliers: [supplier, ...prev.suppliers],
+      }));
+  
+      return {
+        ok: true,
+        message: 'تأمین‌کننده ثبت شد.',
+      };
+    } catch (error) {
+      console.error(
+        'Failed to create supplier in Django API:',
+        error,
+      );
+  
+      return {
+        ok: false,
+        message: 'ثبت تأمین‌کننده در سرور انجام نشد.',
+      };
+    }
   };
-
   const recordSale = ({ customerId, items, paidAmount }) => {
     const customer = data.customers.find((item) => item.id === Number(customerId));
     if (!customer) return { ok: false, message: 'مشتری معتبر انتخاب نشده است.' };
