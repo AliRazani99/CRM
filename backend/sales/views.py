@@ -1,23 +1,79 @@
-from rest_framework import viewsets
-from .models import Sale, SaleItem, Payment, CustomerReceivable
-from .serializers import SaleSerializer, SaleItemSerializer, PaymentSerializer, CustomerReceivableSerializer
+from django.db import transaction
+from rest_framework import permissions, viewsets
+
+from .models import (
+    CustomerReceivable,
+    Payment,
+    Sale,
+    SaleItem,
+)
+from .serializers import (
+    CustomerReceivableSerializer,
+    PaymentSerializer,
+    SaleItemSerializer,
+    SaleSerializer,
+)
+from .services import recalculate_sale
 
 
 class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.all()
     serializer_class = SaleSerializer
+    permission_classes = [
+        permissions.IsAuthenticated,
+    ]
+
+    def perform_create(self, serializer):
+        serializer.save(
+            created_by_user=self.request.user,
+        )
 
 
 class SaleItemViewSet(viewsets.ModelViewSet):
     queryset = SaleItem.objects.all()
     serializer_class = SaleItemSerializer
+    permission_classes = [
+        permissions.IsAuthenticated,
+    ]
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        item = serializer.save()
+        recalculate_sale(item.sale_id)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        item = serializer.save()
+        recalculate_sale(item.sale_id)
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        sale_id = instance.sale_id
+        instance.delete()
+        recalculate_sale(sale_id)
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
+    permission_classes = [
+        permissions.IsAuthenticated,
+    ]
+
+    # پرداخت مالی بعد از ثبت نباید PATCH/DELETE شود.
+    http_method_names = [
+        "get",
+        "post",
+        "head",
+        "options",
+    ]
 
 
-class CustomerReceivableViewSet(viewsets.ModelViewSet):
+class CustomerReceivableViewSet(
+    viewsets.ReadOnlyModelViewSet
+):
     queryset = CustomerReceivable.objects.all()
     serializer_class = CustomerReceivableSerializer
+    permission_classes = [
+        permissions.IsAuthenticated,
+    ]
