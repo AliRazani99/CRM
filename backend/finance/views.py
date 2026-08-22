@@ -1,4 +1,8 @@
-from rest_framework import permissions, viewsets
+from rest_framework import viewsets
+
+from accounts.permissions import (
+    IsStoreManager,
+)
 
 from .models import (
     AccountTransaction,
@@ -14,9 +18,11 @@ class CurrencyExchangeViewSet(
     viewsets.ModelViewSet
 ):
     queryset = CurrencyExchange.objects.all()
-    serializer_class = CurrencyExchangeSerializer
+    serializer_class = (
+        CurrencyExchangeSerializer
+    )
     permission_classes = [
-        permissions.IsAuthenticated,
+        IsStoreManager,
     ]
 
     http_method_names = [
@@ -31,7 +37,9 @@ class AccountTransactionViewSet(
     viewsets.ReadOnlyModelViewSet
 ):
     queryset = AccountTransaction.objects.all()
-    serializer_class = AccountTransactionSerializer
+    serializer_class = (
+        AccountTransactionSerializer
+    )
     permission_classes = [
-        permissions.IsAuthenticated,
+        IsStoreManager,
     ]

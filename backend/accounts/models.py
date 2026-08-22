@@ -3,6 +3,28 @@ from django.db import models
 
 
 class Role(models.Model):
+    class Code(models.TextChoices):
+        STORE_MANAGER = (
+            "STORE_MANAGER",
+            "Store Manager",
+        )
+        SALES_MANAGER = (
+            "SALES_MANAGER",
+            "Sales Manager",
+        )
+        PURCHASE_MANAGER = (
+            "PURCHASE_MANAGER",
+            "Purchase Manager",
+        )
+
+    code = models.CharField(
+        max_length=50,
+        choices=Code.choices,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
     name = models.CharField(
         max_length=100,
         unique=True,

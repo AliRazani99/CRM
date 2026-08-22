@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-
+from accounts.models import Role
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -26,10 +26,19 @@ class SalesTests(APITestCase):
     def setUp(self):
         User = get_user_model()
 
+        sales_role, _ = Role.objects.get_or_create(
+            code=Role.Code.SALES_MANAGER,
+            defaults={
+                "name": "مدیر فروش",
+                "description": "مدیریت فروش و مشتریان",
+            },
+        )
+
         self.user = User.objects.create_user(
             username="sales_tester",
             email="sales_tester@example.com",
             password="test-password-123",
+            role=sales_role,
         )
 
         self.customer = Customer.objects.create(

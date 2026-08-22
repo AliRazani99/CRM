@@ -1,6 +1,10 @@
 from rest_framework import serializers
 
-from .models import Customer, Supplier
+from .models import (
+    Customer,
+    Supplier,
+    Warehouse,
+)
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -31,6 +35,24 @@ class SupplierSerializer(serializers.ModelSerializer):
             "phone",
             "email",
             "is_active",
+            "created_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "created_at",
+        ]
+
+class WarehouseSerializer(
+    serializers.ModelSerializer
+):
+    class Meta:
+        model = Warehouse
+
+        fields = [
+            "id",
+            "name",
+            "location",
             "created_at",
         ]
 

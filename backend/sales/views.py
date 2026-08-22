@@ -1,5 +1,9 @@
 from django.db import transaction
-from rest_framework import permissions, viewsets
+from rest_framework import viewsets
+
+from accounts.permissions import (
+    IsStoreOrSalesManager,
+)
 
 from .models import (
     CustomerReceivable,
@@ -20,7 +24,7 @@ class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.all()
     serializer_class = SaleSerializer
     permission_classes = [
-        permissions.IsAuthenticated,
+        IsStoreOrSalesManager,
     ]
 
     def perform_create(self, serializer):
@@ -33,7 +37,7 @@ class SaleItemViewSet(viewsets.ModelViewSet):
     queryset = SaleItem.objects.all()
     serializer_class = SaleItemSerializer
     permission_classes = [
-        permissions.IsAuthenticated,
+        IsStoreOrSalesManager,
     ]
 
     @transaction.atomic
@@ -57,7 +61,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
     permission_classes = [
-        permissions.IsAuthenticated,
+        IsStoreOrSalesManager,
     ]
 
     # پرداخت مالی بعد از ثبت نباید PATCH/DELETE شود.
@@ -75,5 +79,5 @@ class CustomerReceivableViewSet(
     queryset = CustomerReceivable.objects.all()
     serializer_class = CustomerReceivableSerializer
     permission_classes = [
-        permissions.IsAuthenticated,
+        IsStoreOrSalesManager,
     ]
