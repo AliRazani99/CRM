@@ -4,7 +4,12 @@ import { apiRequest } from './client';
 export function getWarehouses() {
   return apiRequest('/warehouses/');
 }
-
+export function createWarehouse(payload) {
+  return apiRequest('/warehouses/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
 
 export function getInventory() {
   return apiRequest('/inventory/');

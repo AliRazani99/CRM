@@ -22,8 +22,8 @@ import {
   getInventory,
   getStockTransfers,
   getWarehouses,
+  createWarehouse,
 } from '../api/inventory';
-
 
 import {
   useAuth,
@@ -514,7 +514,42 @@ export function ERPProvider({ children }) {
     }
   };
 
+  const addWarehouse = async (payload) => {
 
+    if (!payload.name.trim()) {
+      return {
+        ok: false,
+        message: 'نام انبار الزامی است.',
+      };
+    }
+  
+    try {
+  
+      await createWarehouse({
+        name: payload.name.trim(),
+        location: payload.location.trim(),
+      });
+  
+      await refreshInventory();
+  
+      return {
+        ok: true,
+        message: 'انبار با موفقیت ثبت شد.',
+      };
+  
+    } catch(error) {
+  
+      console.error(
+        'Failed to create warehouse:',
+        error,
+      );
+  
+      return {
+        ok:false,
+        message:'ثبت انبار انجام نشد.',
+      };
+    }
+  };
   const addCustomer = async (payload) => {
     if (!payload.name.trim() || !payload.phone.trim()) {
       return {
@@ -1138,7 +1173,7 @@ export function ERPProvider({ children }) {
     addProduct,
     addCustomer,
     addSupplier,
-  
+    addWarehouse,
     recordSale,
     recordPurchase,
   

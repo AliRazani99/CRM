@@ -70,6 +70,7 @@ export default function InventoryPage() {
     transfers,
     addProduct,
     transferStock,
+    addWarehouse,
   } = useERP();
 
   const { user } = useAuth();
@@ -91,7 +92,25 @@ export default function InventoryPage() {
     productModal,
     setProductModal,
   ] = useState(false);
-
+  const [
+    warehouseModal,
+    setWarehouseModal,
+  ] = useState(false);
+  
+  
+  const [
+    warehouseForm,
+    setWarehouseForm,
+  ] = useState({
+    name:'',
+    location:'',
+  });
+  
+  
+  const [
+    warehouseResult,
+    setWarehouseResult,
+  ] = useState(null);
   const [
     transferModal,
     setTransferModal,
@@ -339,6 +358,16 @@ export default function InventoryPage() {
         actions={
           canManageInventory ? (
             <>
+            <button
+            className="button primary"
+            type="button"
+            onClick={()=>{
+              setWarehouseResult(null);
+              setWarehouseModal(true);
+            }}
+            >
+            افزودن انبار
+            </button>
               <button
                 className="button secondary"
                 type="button"
@@ -713,7 +742,76 @@ export default function InventoryPage() {
           </div>
         </Panel>
       )}
+      <Modal
+        open={warehouseModal}
+        onClose={()=>setWarehouseModal(false)}
+        title="ایجاد انبار جدید"
+        >
 
+        <form
+        className="form-stack"
+        onSubmit={async(e)=>{
+
+          e.preventDefault();
+
+          const result =
+            await addWarehouse(
+              warehouseForm
+            );
+
+          setWarehouseResult(result);
+
+          if(result.ok){
+            setWarehouseForm({
+              name:'',
+              location:'',
+            });
+
+            setTimeout(()=>{
+              setWarehouseModal(false);
+            },600);
+          }
+
+        }}
+        >
+
+        <Field label="نام انبار" required>
+        <input
+        required
+        value={warehouseForm.name}
+        onChange={(e)=>
+          setWarehouseForm({
+          ...warehouseForm,
+          name:e.target.value
+          })
+        }
+        />
+        </Field>
+
+
+        <Field label="موقعیت">
+        <input
+        value={warehouseForm.location}
+        onChange={(e)=>
+          setWarehouseForm({
+          ...warehouseForm,
+          location:e.target.value
+          })
+        }
+        />
+        </Field>
+
+
+        <button
+        className="button primary"
+        >
+        ذخیره
+        </button>
+
+
+        </form>
+
+        </Modal>
       <Modal
         open={productModal}
         onClose={() =>
