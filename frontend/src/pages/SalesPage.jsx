@@ -36,7 +36,7 @@ function createLine(products, warehouses = []) {
       };
 }
 export default function SalesPage({ onNavigate }) {
-  const { products, customers, warehouses, sales, recordSale }=useERP();
+  const { products, customers, warehouses, sales, financialAccounts = [], recordSale, } = useERP();
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [items, setItems] = useState(() => [createLine(products)]);
   const [paidAmount, setPaidAmount] = useState(0);
@@ -48,7 +48,17 @@ export default function SalesPage({ onNavigate }) {
     [items],
   );
   const debt = Math.max(0, total - Number(paidAmount || 0));
+  const irrAccounts =
+  financialAccounts.filter(
+    (account) =>
+      account.currencyCode === 'IRR' &&
+      account.isActive
+  );
 
+const [
+  paymentAccountId,
+  setPaymentAccountId,
+] = useState('');
   const updateLine = (rowId, patch) => {
     setItems((prev) => prev.map((line) => {
       if (line.rowId !== rowId) return line;
@@ -64,13 +74,29 @@ export default function SalesPage({ onNavigate }) {
   const addLine = () => setItems((prev) => [...prev, createLine(products)]);
   const removeLine = (rowId) => setItems((prev) => prev.length === 1 ? prev : prev.filter((line) => line.rowId !== rowId));
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
-    const response = recordSale({ customerId, items, paidAmount });
+  
+    const response =
+      await recordSale({
+        customerId,
+        items,
+        paidAmount,
+        paymentAccountId,
+      });
+  
     setResult(response);
+  
     if (response.ok) {
-      setItems([createLine(products)]);
+      setItems([
+        createLine(
+          products,
+          warehouses,
+        ),
+      ]);
+  
       setPaidAmount(0);
+      setPaymentAccountId('');
     }
   };
 
@@ -161,22 +187,7 @@ export default function SalesPage({ onNavigate }) {
                         </option>
                       ))}
 
-                    </select>
-
-
-                    <input
-                      type="number"
-                      min="1"
-                      value={line.qty}
-                      onChange={(event)=>
-                        updateLine(
-                          line.rowId,
-                          {
-                            qty:event.target.value
-                          }
-                        )
-                      }
-                    />
+                    </select> 
                     <input type="number" min="1" value={line.qty} onChange={(event) => updateLine(line.rowId, { qty: event.target.value })} />
                     <input type="number" min="0" value={line.unitPrice} onChange={(event) => updateLine(line.rowId, { unitPrice: event.target.value })} />
                     <strong className="line-total">{formatToman(Number(line.qty || 0) * Number(line.unitPrice || 0))}</strong>
@@ -195,8 +206,39 @@ export default function SalesPage({ onNavigate }) {
                 <div><span>مانده بدهی</span><strong className={debt > 0 ? 'danger-text' : 'positive-text'}>{formatToman(debt)}</strong></div>
               </div>
               <Field label="مبلغ پرداخت‌شده (تومان)" hint="برای فروش نسیه می‌توانید عدد صفر یا بخشی از مبلغ را وارد کنید.">
+                
                 <input type="number" min="0" max={total} value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} />
               </Field>
+              {Number(paidAmount) > 0 ? (
+              <Field
+                label="حساب دریافت وجه"
+                required
+              >
+                <select
+                  value={paymentAccountId}
+                  onChange={(event) =>
+                    setPaymentAccountId(
+                      event.target.value
+                    )
+                  }
+                >
+                  <option value="">
+                    انتخاب حساب
+                  </option>
+
+                  {irrAccounts.map(
+                    (account) => (
+                      <option
+                        key={account.id}
+                        value={account.id}
+                      >
+                        {account.name}
+                      </option>
+                    )
+                  )}
+                </select>
+              </Field>
+            ) : null}
             </div>
 
             <FormMessage result={result} />
