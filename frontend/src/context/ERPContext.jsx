@@ -658,9 +658,30 @@ export function ERPProvider({ children }) {
       if (item.qty <= 0 || item.unitPrice < 0) {
         return { ok: false, message: 'تعداد و قیمت کالا باید معتبر باشند.' };
       }
-      const available = product.qtyW1 + product.qtyW2 - product.reserved;
-      if (item.qty > available) {
-        return { ok: false, message: `موجودی قابل فروش «${product.name}» کافی نیست.` };
+      const inventory = product.inventories?.find(
+        (inv) =>
+          inv.warehouseId === Number(item.warehouseId)
+      );
+      
+      
+      if (!inventory) {
+        return {
+          ok: false,
+          message:
+            `برای کالا «${product.name}» در این انبار موجودی ثبت نشده است.`,
+        };
+      }
+      
+      
+      if (
+        item.qty >
+        inventory.qtyAvailable
+      ) {
+        return {
+          ok: false,
+          message:
+            `موجودی «${product.name}» در انبار انتخابی کافی نیست.`,
+        };
       }
     }
 

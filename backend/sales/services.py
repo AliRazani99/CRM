@@ -8,7 +8,7 @@ from finance.models import AccountTransaction
 from parties.models import FinancialAccount
 
 from .models import CustomerReceivable, Payment, Sale
-
+from inventory.models import Inventory, StockMovement
 
 @transaction.atomic
 def recalculate_sale(sale_id):
@@ -162,3 +162,40 @@ def register_payment(
     recalculate_sale(sale.pk)
 
     return payment
+
+@transaction.atomic
+def decrease_inventory_for_sale(
+    sale_item,
+    user,
+):
+
+    print("DECREASE INVENTORY CALLED")
+
+    inventory = (
+        Inventory.objects
+        .select_for_update()
+        .get(
+            product=sale_item.product,
+            warehouse=sale_item.warehouse,
+        )
+    )
+
+    if inventory.qty_available < sale_item.quantity:
+        raise ValidationError(
+            "Not enough stock in warehouse."
+        )
+
+    inventory.qty_on_hand -= sale_item.quantity
+    inventory.save()
+
+    movement = StockMovement.objects.create(
+        product=sale_item.product,
+        warehouse=sale_item.warehouse,
+        movement_type="SALE",
+        quantity=-sale_item.quantity,
+        reference_type="SALE",
+        reference_id=sale_item.sale.id,
+        created_by=user,
+    )
+
+    print("SALE MOVEMENT CREATED:", movement.id)

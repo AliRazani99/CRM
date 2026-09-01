@@ -4,15 +4,39 @@ import { useERP } from '../context/ERPContext';
 import { EmptyState, Field, FormMessage, PageHeader, Panel, StatusBadge } from '../components/UI';
 import { formatDate, formatToman } from '../utils/formatters';
 
-function createLine(products) {
+function createLine(products, warehouses = []) {
   const product = products[0];
-  return product
-    ? { rowId: Date.now() + Math.random(), productId: product.id, qty: 1, unitPrice: product.priceIRR }
-    : { rowId: Date.now() + Math.random(), productId: '', qty: 1, unitPrice: 0 };
-}
+  const warehouse = warehouses[0];
 
+  return product
+    ? {
+        rowId: Date.now() + Math.random(),
+
+        productId: product.id,
+
+        warehouseId:
+          warehouse?.id ?? '',
+
+        qty: 1,
+
+        unitPrice:
+          product.priceIRR,
+      }
+    : {
+        rowId: Date.now() + Math.random(),
+
+        productId: '',
+
+        warehouseId:
+          warehouse?.id ?? '',
+
+        qty: 1,
+
+        unitPrice: 0,
+      };
+}
 export default function SalesPage({ onNavigate }) {
-  const { products, customers, sales, recordSale } = useERP();
+  const { products, customers, warehouses, sales, recordSale }=useERP();
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [items, setItems] = useState(() => [createLine(products)]);
   const [paidAmount, setPaidAmount] = useState(0);
@@ -97,7 +121,7 @@ export default function SalesPage({ onNavigate }) {
 
             <div className="line-items-table">
               <div className="line-items-head sale-grid">
-                <span>کالا</span><span>تعداد</span><span>قیمت واحد</span><span>جمع ردیف</span><span />
+              <span>کالا</span> <span>انبار</span> <span>تعداد</span> <span>قیمت واحد</span>
               </div>
               {items.map((line) => {
                 const product = products.find((item) => item.id === Number(line.productId));
@@ -113,6 +137,46 @@ export default function SalesPage({ onNavigate }) {
                       </select>
                       <small className={Number(line.qty) > available ? 'danger-text' : ''}>قابل فروش: {available} واحد</small>
                     </div>
+                    <select
+                      value={line.warehouseId}
+                      onChange={(event)=>
+                        updateLine(
+                          line.rowId,
+                          {
+                            warehouseId:event.target.value
+                          }
+                        )
+                      }
+                    >
+                      <option value="">
+                        انتخاب انبار
+                      </option>
+
+                      {warehouses.map((warehouse)=>(
+                        <option
+                          key={warehouse.id}
+                          value={warehouse.id}
+                        >
+                          {warehouse.name}
+                        </option>
+                      ))}
+
+                    </select>
+
+
+                    <input
+                      type="number"
+                      min="1"
+                      value={line.qty}
+                      onChange={(event)=>
+                        updateLine(
+                          line.rowId,
+                          {
+                            qty:event.target.value
+                          }
+                        )
+                      }
+                    />
                     <input type="number" min="1" value={line.qty} onChange={(event) => updateLine(line.rowId, { qty: event.target.value })} />
                     <input type="number" min="0" value={line.unitPrice} onChange={(event) => updateLine(line.rowId, { unitPrice: event.target.value })} />
                     <strong className="line-total">{formatToman(Number(line.qty || 0) * Number(line.unitPrice || 0))}</strong>

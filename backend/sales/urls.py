@@ -12,7 +12,7 @@ from .views import (
 router = DefaultRouter()
 
 router.register(
-    r"",
+    r"sales",
     SaleViewSet,
     basename="sale",
 )

@@ -10,12 +10,22 @@ from .services import register_payment
 
 
 class SaleItemSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = SaleItem
         fields = "__all__"
         read_only_fields = (
             "line_total_irr",
         )
+
+    def validate(self, data):
+
+        if not data.get("warehouse"):
+            raise serializers.ValidationError(
+                "Warehouse is required for sale item."
+            )
+
+        return data
 
 
 class PaymentSerializer(serializers.ModelSerializer):

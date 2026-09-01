@@ -17,9 +17,10 @@ from .serializers import (
     SaleItemSerializer,
     SaleSerializer,
 )
-from .services import recalculate_sale
-
-
+from .services import (
+    recalculate_sale,
+    decrease_inventory_for_sale,
+)
 class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.all()
     serializer_class = SaleSerializer
@@ -42,8 +43,19 @@ class SaleItemViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
+
+        print("SALE ITEM VIEWSET CREATE CALLED")
+
         item = serializer.save()
-        recalculate_sale(item.sale_id)
+
+        decrease_inventory_for_sale(
+            item,
+            self.request.user,
+        )
+
+        recalculate_sale(
+            item.sale_id
+        )
 
     @transaction.atomic
     def perform_update(self, serializer):
@@ -81,3 +93,4 @@ class CustomerReceivableViewSet(
     permission_classes = [
         IsStoreOrSalesManager,
     ]
+

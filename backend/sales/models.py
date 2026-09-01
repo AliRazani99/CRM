@@ -97,6 +97,13 @@ class SaleItem(models.Model):
         on_delete=models.PROTECT,
         related_name="sale_items",
     )
+    warehouse = models.ForeignKey(
+    "parties.Warehouse",
+    on_delete=models.PROTECT,
+    related_name="sale_items",
+    null=True,
+    blank=True,
+)
 
     quantity = models.PositiveIntegerField()
 
