@@ -1,7 +1,6 @@
 from rest_framework import viewsets
 
 from accounts.permissions import (
-    IsOperationalUser,
     IsStoreOrPurchaseManager,
     IsStoreOrSalesManager,
     OperationalReadOnlyStoreWrite,
@@ -9,64 +8,113 @@ from accounts.permissions import (
 
 from .models import (
     Customer,
+    FinancialAccount,
     Supplier,
     Warehouse,
-    FinancialAccount,
 )
 
 from .serializers import (
     CustomerSerializer,
+    FinancialAccountCreateSerializer,
+    FinancialAccountSerializer,
+    FinancialAccountUpdateSerializer,
     SupplierSerializer,
     WarehouseSerializer,
-    FinancialAccountSerializer,
 )
 
 
-class CustomerViewSet(viewsets.ModelViewSet):
-    queryset = Customer.objects.all().order_by(
-        "-created_at"
+class CustomerViewSet(
+    viewsets.ModelViewSet
+):
+    queryset = (
+        Customer.objects
+        .all()
+        .order_by(
+            "-created_at"
+        )
     )
-    serializer_class = CustomerSerializer
+
+    serializer_class = (
+        CustomerSerializer
+    )
+
     permission_classes = [
         IsStoreOrSalesManager,
     ]
 
 
-class SupplierViewSet(viewsets.ModelViewSet):
-    queryset = Supplier.objects.all().order_by(
-        "-created_at"
+class SupplierViewSet(
+    viewsets.ModelViewSet
+):
+    queryset = (
+        Supplier.objects
+        .all()
+        .order_by(
+            "-created_at"
+        )
     )
-    serializer_class = SupplierSerializer
+
+    serializer_class = (
+        SupplierSerializer
+    )
+
     permission_classes = [
         IsStoreOrPurchaseManager,
     ]
 
+
 class WarehouseViewSet(
     viewsets.ModelViewSet
 ):
-    queryset = Warehouse.objects.all().order_by(
-        "id"
+    queryset = (
+        Warehouse.objects
+        .all()
+        .order_by("id")
     )
 
-    serializer_class = WarehouseSerializer
+    serializer_class = (
+        WarehouseSerializer
+    )
 
     permission_classes = [
         OperationalReadOnlyStoreWrite,
     ]
 
+
 class FinancialAccountViewSet(
-    viewsets.ReadOnlyModelViewSet
+    viewsets.ModelViewSet
 ):
+    # Inactive accounts remain visible for audit.
+    # Frontend selection lists can filter them out.
     queryset = (
         FinancialAccount.objects
-        .filter(is_active=True)
+        .all()
         .order_by("id")
     )
 
-    serializer_class = (
-        FinancialAccountSerializer
-    )
-
     permission_classes = [
-        IsOperationalUser,
+        OperationalReadOnlyStoreWrite,
     ]
+
+    # Never DELETE financial accounts.
+    # Never PUT full account state.
+    http_method_names = [
+        "get",
+        "post",
+        "patch",
+        "head",
+        "options",
+    ]
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return (
+                FinancialAccountCreateSerializer
+            )
+
+        if self.action == "partial_update":
+            return (
+                FinancialAccountUpdateSerializer
+            )
+
+        return FinancialAccountSerializer

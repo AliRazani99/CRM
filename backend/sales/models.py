@@ -20,6 +20,12 @@ class Sale(models.Model):
     )
 
     sale_date = models.DateField()
+    cad_rate_irr_per_cad = models.DecimalField(
+    max_digits=20,
+    decimal_places=2,
+    null=True,
+    blank=True,
+)
 
     total_amount = models.DecimalField(
         max_digits=18,
@@ -72,6 +78,18 @@ class Sale(models.Model):
                 name="sale_total_amount_gte_zero",
             ),
             models.CheckConstraint(
+                check=(
+                    Q(
+                        cad_rate_irr_per_cad__isnull=True
+                    )
+                    |
+                    Q(
+                        cad_rate_irr_per_cad__gt=0
+                    )
+                ),
+                name="sale_cad_rate_positive_or_null",
+            ),
+            models.CheckConstraint(
                 check=Q(total_paid__gte=0),
                 name="sale_total_paid_gte_zero",
             ),
@@ -116,8 +134,28 @@ class SaleItem(models.Model):
         max_digits=18,
         decimal_places=2,
         default=0,
+        
+    )
+    unit_cost_cad_snapshot = models.DecimalField(
+    max_digits=20,
+    decimal_places=2,
+    null=True,
+    blank=True,
     )
 
+    line_cogs_cad = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    line_cogs_irr = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     def save(self, *args, **kwargs):
         self.line_total_irr = self.unit_price_irr * self.quantity
         super().save(*args, **kwargs)
@@ -143,6 +181,43 @@ class SaleItem(models.Model):
             models.CheckConstraint(
                 check=Q(line_total_irr__gte=0),
                 name="sale_item_total_gte_zero",
+            ),
+            models.CheckConstraint(
+                check=(
+                    Q(
+                        unit_cost_cad_snapshot__isnull=True
+                    )
+                    |
+                    Q(
+                        unit_cost_cad_snapshot__gte=0
+                    )
+                ),
+                name="sale_item_cost_snapshot_positive_or_null",
+            ),
+
+            models.CheckConstraint(
+                check=(
+                    Q(
+                        line_cogs_cad__isnull=True
+                    )
+                    |
+                    Q(
+                        line_cogs_cad__gte=0
+                    )
+                ),
+                name="sale_item_cogs_cad_positive_or_null",
+            ),
+            models.CheckConstraint(
+                check=(
+                    Q(
+                        line_cogs_irr__isnull=True
+                    )
+                    |
+                    Q(
+                        line_cogs_irr__gte=0
+                    )
+                ),
+                name="sale_item_cogs_irr_positive_or_null",
             ),
         ]
 

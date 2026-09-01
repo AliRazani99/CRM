@@ -108,62 +108,220 @@ function matchesProduct(item, selectedProductId) {
   return selectedProductId === 'all' || item.productId === Number(selectedProductId);
 }
 
-function makeTimeSeries(timeframe, sales, purchases, cadRate, selectedProductId) {
-  const buckets = getBuckets(timeframe).map((bucket) => ({
-    ...bucket,
-    salesValue: 0,
-    purchaseValue: 0,
-    soldQty: 0,
-    purchasedQty: 0,
-    cashIn: 0,
-    cashOut: 0,
-  }));
+function makeTimeSeries(
+  timeframe,
+  sales,
+  purchases,
+  selectedProductId,
+) {
+  const buckets =
+    getBuckets(timeframe).map(
+      (bucket) => ({
+        ...bucket,
 
-  sales.forEach((sale) => {
-    const date = new Date(sale.date);
-    const bucket = buckets.find((item) => date >= item.start && date < item.end);
-    if (!bucket) return;
+        salesValue: 0,
+        purchaseValue: 0,
 
-    const matchingItems = sale.items.filter((item) => matchesProduct(item, selectedProductId));
-    if (matchingItems.length === 0) return;
+        soldQty: 0,
+        purchasedQty: 0,
 
-    const lineValue = matchingItems.reduce((sum, item) => sum + item.lineTotal, 0);
-    const lineQty = matchingItems.reduce((sum, item) => sum + item.qty, 0);
-    const collectionRatio = sale.total > 0 ? sale.paid / sale.total : 0;
-
-    bucket.salesValue += lineValue;
-    bucket.soldQty += lineQty;
-    bucket.cashIn += lineValue * collectionRatio;
-  });
-
-  purchases.forEach((purchase) => {
-    const date = new Date(purchase.date);
-    const bucket = buckets.find((item) => date >= item.start && date < item.end);
-    if (!bucket) return;
-
-    const matchingItems = purchase.items.filter((item) => matchesProduct(item, selectedProductId));
-    if (matchingItems.length === 0) return;
-
-    const lineValue = matchingItems.reduce(
-      (sum, item) => sum + item.qty * (item.landedUnitCostCAD ?? item.unitCostCAD ?? 0) * cadRate,
-      0,
+        cashIn: 0,
+        cashOut: 0,
+      })
     );
-    const lineQty = matchingItems.reduce((sum, item) => sum + item.qty, 0);
 
-    bucket.purchaseValue += lineValue;
-    bucket.purchasedQty += lineQty;
-    bucket.cashOut += lineValue;
-  });
+  sales.forEach(
+    (sale) => {
+      const date =
+        new Date(
+          sale.date
+        );
 
-  return buckets.map((bucket) => ({
-    label: bucket.label,
-    فروش: Math.round(bucket.salesValue / MILLION),
-    خرید: Math.round(bucket.purchaseValue / MILLION),
-    'تعداد فروش': bucket.soldQty,
-    'تعداد خرید': bucket.purchasedQty,
-    'ورودی نقدی': Math.round(bucket.cashIn / MILLION),
-    'خروجی نقدی': Math.round(bucket.cashOut / MILLION),
-  }));
+      const bucket =
+        buckets.find(
+          (item) =>
+            date >= item.start &&
+            date < item.end
+        );
+
+      if (!bucket) {
+        return;
+      }
+
+      const matchingItems =
+        sale.items.filter(
+          (item) =>
+            matchesProduct(
+              item,
+              selectedProductId
+            )
+        );
+
+      if (
+        matchingItems.length === 0
+      ) {
+        return;
+      }
+
+      const lineValue =
+        matchingItems.reduce(
+          (sum, item) =>
+            sum +
+            (
+              Number(
+                item.lineTotal
+              ) || 0
+            ),
+          0
+        );
+
+      const lineQty =
+        matchingItems.reduce(
+          (sum, item) =>
+            sum +
+            (
+              Number(
+                item.qty
+              ) || 0
+            ),
+          0
+        );
+
+      const collectionRatio =
+        sale.total > 0
+          ? sale.paid /
+            sale.total
+          : 0;
+
+      bucket.salesValue +=
+        lineValue;
+
+      bucket.soldQty +=
+        lineQty;
+
+      bucket.cashIn +=
+        lineValue *
+        collectionRatio;
+    }
+  );
+
+  purchases.forEach(
+    (purchase) => {
+      const date =
+        new Date(
+          purchase.date
+        );
+
+      const bucket =
+        buckets.find(
+          (item) =>
+            date >= item.start &&
+            date < item.end
+        );
+
+      if (!bucket) {
+        return;
+      }
+
+      const matchingItems =
+        purchase.items.filter(
+          (item) =>
+            matchesProduct(
+              item,
+              selectedProductId
+            )
+        );
+
+      if (
+        matchingItems.length === 0
+      ) {
+        return;
+      }
+
+      const purchaseRate =
+        Number(
+          purchase.cadRateToman
+        ) || 0;
+
+      const lineValue =
+        matchingItems.reduce(
+          (sum, item) =>
+            sum +
+            (
+              Number(
+                item.qty
+              ) || 0
+            ) *
+            (
+              Number(
+                item.landedUnitCostCAD ??
+                item.unitCostCAD ??
+                0
+              ) || 0
+            ) *
+            purchaseRate,
+          0
+        );
+
+      const lineQty =
+        matchingItems.reduce(
+          (sum, item) =>
+            sum +
+            (
+              Number(
+                item.qty
+              ) || 0
+            ),
+          0
+        );
+
+      bucket.purchaseValue +=
+        lineValue;
+
+      bucket.purchasedQty +=
+        lineQty;
+
+      bucket.cashOut +=
+        lineValue;
+    }
+  );
+
+  return buckets.map(
+    (bucket) => ({
+      label:
+        bucket.label,
+
+      فروش:
+        Math.round(
+          bucket.salesValue /
+          MILLION
+        ),
+
+      خرید:
+        Math.round(
+          bucket.purchaseValue /
+          MILLION
+        ),
+
+      'تعداد فروش':
+        bucket.soldQty,
+
+      'تعداد خرید':
+        bucket.purchasedQty,
+
+      'ورودی نقدی':
+        Math.round(
+          bucket.cashIn /
+          MILLION
+        ),
+
+      'خروجی نقدی':
+        Math.round(
+          bucket.cashOut /
+          MILLION
+        ),
+    })
+  );
 }
 
 function getRange(timeframe) {
@@ -174,65 +332,223 @@ function getRange(timeframe) {
   };
 }
 
-function aggregatePerformance({ products, sales, purchases, cadRate, timeframe, selectedProductId }) {
-  const range = getRange(timeframe);
-  const productMap = new Map(
-    products.map((product) => [
-      product.id,
-      {
-        productId: product.id,
-        name: product.name,
-        category: product.category,
-        salesValue: 0,
-        purchaseValue: 0,
-        soldQty: 0,
-        purchasedQty: 0,
-        cogs: 0,
-        available: product.qtyW1 + product.qtyW2 - product.reserved,
-      },
-    ]),
+function aggregatePerformance({
+  products,
+  sales,
+  purchases,
+  timeframe,
+  selectedProductId,
+}) {
+  const range =
+    getRange(timeframe);
+
+  const productMap =
+    new Map(
+      products.map(
+        (product) => [
+          product.id,
+          {
+            productId:
+              product.id,
+
+            name:
+              product.name,
+
+            category:
+              product.category,
+
+            salesValue:
+              0,
+
+            purchaseValue:
+              0,
+
+            soldQty:
+              0,
+
+            purchasedQty:
+              0,
+
+            cogs:
+              0,
+
+            cogsMissing:
+              false,
+
+            available:
+              Number(
+                product.available
+              ) || 0,
+          },
+        ]
+      )
+    );
+
+  sales.forEach(
+    (sale) => {
+      const date =
+        new Date(
+          sale.date
+        );
+
+      if (
+        date < range.start ||
+        date >= range.end
+      ) {
+        return;
+      }
+
+      sale.items.forEach(
+        (item) => {
+          if (
+            !matchesProduct(
+              item,
+              selectedProductId
+            )
+          ) {
+            return;
+          }
+
+          const row =
+            productMap.get(
+              item.productId
+            );
+
+          if (!row) {
+            return;
+          }
+
+          row.salesValue +=
+            Number(
+              item.lineTotal
+            ) || 0;
+
+          row.soldQty +=
+            Number(
+              item.qty
+            ) || 0;
+
+          /*
+           * Historical COGS:
+           * هزینه همان لحظه فروش.
+           */
+          if (
+            item.lineCogsToman ==
+            null
+          ) {
+            row.cogsMissing =
+              true;
+          } else {
+            row.cogs +=
+              Number(
+                item.lineCogsToman
+              ) || 0;
+          }
+        }
+      );
+    }
   );
 
-  sales.forEach((sale) => {
-    const date = new Date(sale.date);
-    if (date < range.start || date >= range.end) return;
+  purchases.forEach(
+    (purchase) => {
+      const date =
+        new Date(
+          purchase.date
+        );
 
-    sale.items.forEach((item) => {
-      if (!matchesProduct(item, selectedProductId)) return;
-      const row = productMap.get(item.productId);
-      const product = products.find((candidate) => candidate.id === item.productId);
-      if (!row || !product) return;
+      if (
+        date < range.start ||
+        date >= range.end
+      ) {
+        return;
+      }
 
-      row.salesValue += item.lineTotal;
-      row.soldQty += item.qty;
-      row.cogs += item.qty * product.costCAD * cadRate;
-    });
-  });
+      const purchaseRate =
+        Number(
+          purchase.cadRateToman
+        ) || 0;
 
-  purchases.forEach((purchase) => {
-    const date = new Date(purchase.date);
-    if (date < range.start || date >= range.end) return;
+      purchase.items.forEach(
+        (item) => {
+          if (
+            !matchesProduct(
+              item,
+              selectedProductId
+            )
+          ) {
+            return;
+          }
 
-    purchase.items.forEach((item) => {
-      if (!matchesProduct(item, selectedProductId)) return;
-      const row = productMap.get(item.productId);
-      if (!row) return;
+          const row =
+            productMap.get(
+              item.productId
+            );
 
-      row.purchaseValue += item.qty * (item.landedUnitCostCAD ?? item.unitCostCAD ?? 0) * cadRate;
-      row.purchasedQty += item.qty;
-    });
-  });
+          if (!row) {
+            return;
+          }
 
-  return [...productMap.values()]
-    .filter((row) => selectedProductId === 'all' || row.productId === Number(selectedProductId))
-    .map((row) => {
-      const grossProfit = row.salesValue - row.cogs;
-      return {
-        ...row,
-        grossProfit,
-        margin: row.salesValue > 0 ? (grossProfit / row.salesValue) * 100 : 0,
-      };
-    });
+          const landedCostCAD =
+            Number(
+              item.landedUnitCostCAD ??
+              item.unitCostCAD ??
+              0
+            );
+
+          row.purchaseValue +=
+            (
+              Number(
+                item.qty
+              ) || 0
+            ) *
+            landedCostCAD *
+            purchaseRate;
+
+          row.purchasedQty +=
+            Number(
+              item.qty
+            ) || 0;
+        }
+      );
+    }
+  );
+
+  return [
+    ...productMap.values(),
+  ]
+    .filter(
+      (row) =>
+        selectedProductId ===
+          'all' ||
+        row.productId ===
+          Number(
+            selectedProductId
+          )
+    )
+    .map(
+      (row) => {
+        const grossProfit =
+          row.cogsMissing
+            ? null
+            : row.salesValue -
+              row.cogs;
+
+        return {
+          ...row,
+
+          grossProfit,
+
+          margin:
+            grossProfit != null &&
+            row.salesValue > 0
+              ? (
+                  grossProfit /
+                  row.salesValue
+                ) * 100
+              : null,
+        };
+      }
+    );
 }
 
 function truncate(value, length = 18) {
@@ -247,21 +563,26 @@ export default function DashboardPage({ onNavigate }) {
   const selectedProduct = products.find((product) => product.id === Number(selectedProductId));
   const productLabel = selectedProduct?.name ?? 'همه کالاها';
 
-  const trendData = useMemo(
-    () => makeTimeSeries(timeframe, sales, purchases, accounts.cadRate, selectedProductId),
-    [timeframe, sales, purchases, accounts.cadRate, selectedProductId],
-  );
+  const trendData = useMemo( () => makeTimeSeries( timeframe, sales, purchases, selectedProductId, ), [ timeframe, sales, purchases, selectedProductId, ], );
 
-  const performanceRows = useMemo(
-    () => aggregatePerformance({
+  const performanceRows =
+  useMemo(
+    () =>
+      aggregatePerformance({
+        products,
+        sales,
+        purchases,
+        timeframe,
+        selectedProductId,
+      }),
+
+    [
       products,
       sales,
       purchases,
-      cadRate: accounts.cadRate,
       timeframe,
       selectedProductId,
-    }),
-    [products, sales, purchases, accounts.cadRate, timeframe, selectedProductId],
+    ],
   );
 
   const periodMetrics = useMemo(() => {
@@ -269,8 +590,26 @@ export default function DashboardPage({ onNavigate }) {
     const purchaseValue = performanceRows.reduce((sum, row) => sum + row.purchaseValue, 0);
     const soldQty = performanceRows.reduce((sum, row) => sum + row.soldQty, 0);
     const purchasedQty = performanceRows.reduce((sum, row) => sum + row.purchasedQty, 0);
-    const cogs = performanceRows.reduce((sum, row) => sum + row.cogs, 0);
-    const grossProfit = salesValue - cogs;
+    const cogs =
+  performanceRows.reduce(
+    (sum, row) =>
+      sum +
+      Number(
+        row.cogs
+      ),
+    0
+  );
+
+const cogsComplete =
+  performanceRows.every(
+    (row) =>
+      !row.cogsMissing
+  );
+
+const grossProfit =
+  cogsComplete
+    ? salesValue - cogs
+    : null;
     const available = performanceRows.reduce((sum, row) => sum + row.available, 0);
     const sellThroughBase = soldQty + Math.max(available, 0);
 
@@ -279,20 +618,53 @@ export default function DashboardPage({ onNavigate }) {
       purchaseValue,
       soldQty,
       purchasedQty,
+      cogs,
+      cogsComplete,
       grossProfit,
-      margin: salesValue > 0 ? (grossProfit / salesValue) * 100 : 0,
+
+      margin:
+        grossProfit != null &&
+        salesValue > 0
+          ? (
+              grossProfit /
+              salesValue
+            ) * 100
+          : null,
       averageSalePrice: soldQty > 0 ? salesValue / soldQty : 0,
       available,
       sellThrough: sellThroughBase > 0 ? (soldQty / sellThroughBase) * 100 : 0,
     };
   }, [performanceRows]);
 
-  const categoryData = useMemo(() => {
-    const map = new Map();
-    products.forEach((product) => {
-      const value = (product.qtyW1 + product.qtyW2) * product.costCAD;
-      map.set(product.category, (map.get(product.category) ?? 0) + value);
-    });
+  const categoryData =
+  useMemo(() => {
+    const map =
+      new Map();
+
+    products.forEach(
+      (product) => {
+        const value =
+          (
+            Number(
+              product.totalOnHand
+            ) || 0
+          ) *
+          (
+            Number(
+              product.costCAD
+            ) || 0
+          );
+
+        map.set(
+          product.category,
+          (
+            map.get(
+              product.category
+            ) ?? 0
+          ) + value
+        );
+      }
+    );
     return [...map.entries()].map(([name, value], index) => ({
       name,
       value: Math.round(value),
@@ -300,29 +672,76 @@ export default function DashboardPage({ onNavigate }) {
     }));
   }, [products]);
 
-  const topProductsData = useMemo(
-    () => [...performanceRows]
-      .filter((row) => row.salesValue > 0 || row.purchaseValue > 0)
-      .sort((a, b) => b.salesValue - a.salesValue)
-      .slice(0, 7)
-      .map((row) => ({
-        name: truncate(row.name),
-        فروش: Math.round(row.salesValue / MILLION),
-        سود: Math.round(row.grossProfit / MILLION),
-      })),
-    [performanceRows],
-  );
+  const topProductsData =
+  useMemo(
+    () =>
+      [...performanceRows]
+        .filter(
+          (row) =>
+            row.salesValue > 0 ||
+            row.purchaseValue > 0
+        )
+        .sort(
+          (a, b) =>
+            b.salesValue -
+            a.salesValue
+        )
+        .slice(
+          0,
+          7
+        )
+        .map(
+          (row) => ({
+            name:
+              truncate(
+                row.name
+              ),
 
+            فروش:
+              Math.round(
+                row.salesValue /
+                MILLION
+              ),
+
+            سود:
+              row.grossProfit ==
+              null
+                ? null
+                : Math.round(
+                    row.grossProfit /
+                      MILLION
+                  ),
+          })
+        ),
+
+    [
+      performanceRows,
+    ],
+  );
   const stockData = useMemo(() => {
     const candidates = selectedProductId === 'all'
       ? products.slice(0, 8)
       : products.filter((product) => product.id === Number(selectedProductId));
 
-    return candidates.map((product) => ({
-      name: truncate(product.name, 14),
-      موجودی: product.qtyW1 + product.qtyW2 - product.reserved,
-      حداقل: product.minStock,
-    }));
+      return candidates.map(
+        (product) => ({
+          name:
+            truncate(
+              product.name,
+              14
+            ),
+      
+          موجودی:
+            Number(
+              product.available
+            ) || 0,
+      
+          حداقل:
+            Number(
+              product.minStock
+            ) || 0,
+        })
+      );
   }, [products, selectedProductId]);
 
   const receivablesData = useMemo(() => {
@@ -350,8 +769,25 @@ export default function DashboardPage({ onNavigate }) {
   }, [sales, timeframe, selectedProductId]);
 
   const lowStock = products
-    .filter((product) => selectedProductId === 'all' || product.id === Number(selectedProductId))
-    .map((product) => ({ ...product, available: product.qtyW1 + product.qtyW2 - product.reserved }))
+  .filter(
+    (product) =>
+      selectedProductId ===
+        'all' ||
+      product.id ===
+        Number(
+          selectedProductId
+        )
+  )
+  .map(
+    (product) => ({
+      ...product,
+
+      available:
+        Number(
+          product.available
+        ) || 0,
+    })
+  )
     .filter((product) => product.available <= product.minStock)
     .sort((a, b) => a.available - b.available);
 
@@ -427,8 +863,8 @@ export default function DashboardPage({ onNavigate }) {
       <div className="kpi-grid kpi-grid-4">
         <KpiCard title="فروش در بازه" value={formatCompactToman(periodMetrics.salesValue)} hint={`${periodMetrics.soldQty} واحد فروخته‌شده`} icon={<ArrowUpRight size={21} />} tone="emerald" />
         <KpiCard title="خرید در بازه" value={formatCompactToman(periodMetrics.purchaseValue)} hint={`${periodMetrics.purchasedQty} واحد خریداری‌شده`} icon={<ArrowDownLeft size={21} />} tone="indigo" />
-        <KpiCard title="سود ناخالص برآوردی" value={formatCompactToman(periodMetrics.grossProfit)} hint="بر اساس بهای فعلی ثبت‌شده کالا" icon={<TrendingUp size={21} />} tone="purple" />
-        <KpiCard title="حاشیه سود" value={`${periodMetrics.margin.toFixed(1)}٪`} hint={`میانگین فروش هر واحد: ${formatCompactToman(periodMetrics.averageSalePrice)}`} icon={<Percent size={21} />} tone="amber" />
+        <KpiCard title="سود ناخالص تاریخی" value={ periodMetrics.grossProfit == null ? 'نامشخص' : formatCompactToman( periodMetrics.grossProfit ) } hint={ periodMetrics.cogsComplete ? 'بر اساس بهای تمام‌شده در لحظه فروش' : 'برخی فروش‌های قدیمی فاقد COGS تاریخی هستند' } icon={ <TrendingUp size={21} /> } tone="purple" />
+        <KpiCard title="حاشیه سود" value={ periodMetrics.margin == null ? 'نامشخص' : `${periodMetrics.margin.toFixed(1)}٪` } hint={ `میانگین فروش هر واحد: ${ formatCompactToman( periodMetrics.averageSalePrice ) }` } icon={ <Percent size={21} /> } tone="amber" />
       </div>
 
       <div className="kpi-grid kpi-grid-4 compact-kpis">
@@ -671,8 +1107,7 @@ export default function DashboardPage({ onNavigate }) {
               <strong>{formatToman(metrics.totalDebt)}</strong>
             </div>
             <div className="finance-summary-row">
-              <span><Trophy size={17} /> سود دوره فیلترشده</span>
-              <strong>{formatToman(periodMetrics.grossProfit)}</strong>
+            <span> <Trophy size={17} /> سود دوره فیلترشده </span> <strong> { periodMetrics.grossProfit == null ? 'نامشخص' : formatToman( periodMetrics.grossProfit ) } </strong>
             </div>
             <div className="rate-strip">
               <span><Coins size={15} /> نرخ تسعیر CAD</span>

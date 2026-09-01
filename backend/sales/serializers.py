@@ -106,7 +106,16 @@ class SaleCreateSerializer(
     sale_date = serializers.DateField(
         default=timezone.localdate,
     )
-
+    cad_rate_irr_per_cad = (
+        serializers.DecimalField(
+            max_digits=20,
+            decimal_places=2,
+            min_value=Decimal("0.01"),
+            required=False,
+            allow_null=True,
+            default=None,
+        )
+    )
     items = SaleCreateItemSerializer(
         many=True,
     )

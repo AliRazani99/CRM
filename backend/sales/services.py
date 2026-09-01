@@ -158,7 +158,7 @@ def register_payment(
         amount=amount,
         currency_code=currency_code,
         reference_type="SALES",
-        reference_id=payment.id,
+        reference_id=sale.id,
         description=(
             f"Payment for sale {sale.invoice_number}"
         ),
@@ -172,10 +172,8 @@ def register_payment(
 def decrease_inventory_for_sale(
     sale_item,
     user,
+    cad_rate_irr_per_cad=None,
 ):
-
-    print("DECREASE INVENTORY CALLED")
-
     inventory = (
         Inventory.objects
         .select_for_update()
@@ -185,15 +183,64 @@ def decrease_inventory_for_sale(
         )
     )
 
-    if inventory.qty_available < sale_item.quantity:
+    if (
+        inventory.qty_available
+        < sale_item.quantity
+    ):
         raise ValidationError(
             "Not enough stock in warehouse."
         )
 
-    inventory.qty_on_hand -= sale_item.quantity
-    inventory.save()
+    unit_cost_cad_snapshot = (
+        inventory.avg_cost_cad
+    )
 
-    movement = StockMovement.objects.create(
+    line_cogs_cad = (
+        unit_cost_cad_snapshot
+        * sale_item.quantity
+    )
+
+    line_cogs_irr = None
+
+    if cad_rate_irr_per_cad is not None:
+        line_cogs_irr = (
+            line_cogs_cad
+            * Decimal(
+                cad_rate_irr_per_cad
+            )
+        )
+
+    sale_item.unit_cost_cad_snapshot = (
+        unit_cost_cad_snapshot
+    )
+
+    sale_item.line_cogs_cad = (
+        line_cogs_cad
+    )
+
+    sale_item.line_cogs_irr = (
+        line_cogs_irr
+    )
+
+    sale_item.save(
+        update_fields=[
+            "unit_cost_cad_snapshot",
+            "line_cogs_cad",
+            "line_cogs_irr",
+        ]
+    )
+
+    inventory.qty_on_hand -= (
+        sale_item.quantity
+    )
+
+    inventory.save(
+        update_fields=[
+            "qty_on_hand",
+        ]
+    )
+
+    StockMovement.objects.create(
         product=sale_item.product,
         warehouse=sale_item.warehouse,
         movement_type="SALE",
@@ -203,8 +250,6 @@ def decrease_inventory_for_sale(
         created_by=user,
     )
 
-    print("SALE MOVEMENT CREATED:", movement.id)
-
 @transaction.atomic
 def create_sale_with_items_and_payment(
     *,
@@ -212,6 +257,7 @@ def create_sale_with_items_and_payment(
     sale_date,
     items,
     created_by,
+    cad_rate_irr_per_cad=None,
     paid_amount=Decimal("0.00"),
     payment_account=None,
     payment_method="CASH",
@@ -221,7 +267,15 @@ def create_sale_with_items_and_payment(
         raise ValidationError(
             "Sale must contain at least one item."
         )
+    if cad_rate_irr_per_cad is not None:
+        cad_rate_irr_per_cad = Decimal(
+            cad_rate_irr_per_cad
+        )
 
+    if cad_rate_irr_per_cad <= 0:
+        raise ValidationError(
+            "CAD rate must be greater than zero."
+        )
     if paid_amount < 0:
         raise ValidationError(
             "Paid amount cannot be negative."
@@ -240,11 +294,15 @@ def create_sale_with_items_and_payment(
         customer=customer,
         invoice_number=temporary_invoice_number,
         sale_date=sale_date,
+
+        cad_rate_irr_per_cad=(
+            cad_rate_irr_per_cad
+        ),
+
         notes=notes,
         created_by_user=created_by,
     )
 
-    # شماره فاکتور پایدار و وابسته به ID دیتابیس
     sale.invoice_number = (
         f"INV-{sale.pk:06d}"
     )
@@ -269,6 +327,7 @@ def create_sale_with_items_and_payment(
         decrease_inventory_for_sale(
             item,
             created_by,
+            cad_rate_irr_per_cad,
         )
 
     recalculate_sale(

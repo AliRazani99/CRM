@@ -1,6 +1,7 @@
-from django.db import models
 from django.conf import settings
+from django.db import models
 from django.db.models import F, Q
+
 
 class CurrencyExchange(models.Model):
     exchange_partner_name = models.CharField(
@@ -22,7 +23,7 @@ class CurrencyExchange(models.Model):
     )
 
     from_amount = models.DecimalField(
-        max_digits=18,
+        max_digits=20,
         decimal_places=2,
     )
 
@@ -31,7 +32,7 @@ class CurrencyExchange(models.Model):
     )
 
     to_amount = models.DecimalField(
-        max_digits=18,
+        max_digits=20,
         decimal_places=2,
     )
 
@@ -39,9 +40,17 @@ class CurrencyExchange(models.Model):
         max_length=3,
     )
 
+    # Stored as:
+    # destination currency units per 1 source currency unit.
+    #
+    # Example:
+    # 72,500,000 IRR -> 100 CAD
+    # exchange_rate ~= 0.000001379310
+    #
+    # 12 decimal places are required for realistic IRR -> CAD rates.
     exchange_rate = models.DecimalField(
-        max_digits=18,
-        decimal_places=6,
+        max_digits=24,
+        decimal_places=12,
     )
 
     created_by_user = models.ForeignKey(
@@ -79,7 +88,11 @@ class CurrencyExchange(models.Model):
                 name="exchange_rate_gt_zero",
             ),
             models.CheckConstraint(
-                check=~Q(from_account=F("to_account")),
+                check=~Q(
+                    from_account=F(
+                        "to_account"
+                    )
+                ),
                 name="exchange_accounts_different",
             ),
         ]
@@ -91,10 +104,31 @@ class AccountTransaction(models.Model):
         ("OUT", "Outflow"),
     ]
 
+    # This pair:
+    #
+    #     reference_type + reference_id
+    #
+    # acts as an explicit lightweight polymorphic reference.
+    #
+    # Contract:
+    # SALES              -> Sale.id
+    # PROCUREMENT        -> Purchase.id
+    # CURRENCY_EXCHANGE  -> CurrencyExchange.id
+    # FINANCIAL_ACCOUNT  -> FinancialAccount.id
+    #
+    # We intentionally do not use GenericForeignKey here.
+    # The explicit enum is easier to audit and expose through the API.
     REFERENCE_TYPE_CHOICES = [
         ("PROCUREMENT", "Procurement"),
         ("SALES", "Sales"),
-        ("CURRENCY_EXCHANGE", "Currency Exchange"),
+        (
+            "CURRENCY_EXCHANGE",
+            "Currency Exchange",
+        ),
+        (
+            "FINANCIAL_ACCOUNT",
+            "Financial Account",
+        ),
     ]
 
     account = models.ForeignKey(
@@ -115,7 +149,7 @@ class AccountTransaction(models.Model):
     )
 
     amount = models.DecimalField(
-        max_digits=18,
+        max_digits=20,
         decimal_places=2,
     )
 
@@ -146,8 +180,10 @@ class AccountTransaction(models.Model):
 
     def __str__(self):
         return (
-            f"{self.transaction_type} ({self.direction}) "
-            f"- {self.amount} {self.currency_code}"
+            f"{self.transaction_type} "
+            f"({self.direction}) "
+            f"- {self.amount} "
+            f"{self.currency_code}"
         )
 
     class Meta:

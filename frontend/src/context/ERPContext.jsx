@@ -13,7 +13,21 @@ import {
   getCustomers,
   getSuppliers,
   getFinancialAccounts,
+
+  createFinancialAccount
+    as createFinancialAccountApi,
+
+  updateFinancialAccount
+    as updateFinancialAccountApi,
 } from '../api/parties';
+
+import {
+  createCurrencyExchange
+    as createCurrencyExchangeApi,
+
+  getAccountTransactions,
+  getCurrencyExchanges,
+} from '../api/finance';
 
 import {
   createProduct,
@@ -34,6 +48,11 @@ import {
   getSales,
   settleCustomerDebtApi,
 } from '../api/sales';
+
+import {
+  createPurchase,
+  getPurchases,
+} from '../api/procurement';
 
 import {
   useAuth,
@@ -63,9 +82,11 @@ const mapSupplierFromApi = (supplier) => ({
 const mapFinancialAccountFromApi = (
   account,
 ) => ({
-  id: Number(account.id),
+  id:
+    Number(account.id),
 
-  name: account.name,
+  name:
+    account.name,
 
   accountType:
     account.account_type,
@@ -74,13 +95,206 @@ const mapFinancialAccountFromApi = (
     account.currency_code,
 
   currentBalance:
-    irrToToman(
-      account.current_balance
-    ),
+    account.currency_code === 'IRR'
+      ? irrToToman(
+          account.current_balance
+        )
+      : Number(
+          account.current_balance
+        ),
 
   isActive:
     account.is_active,
 });
+
+const mapTransactionFromApi = (
+  transaction,
+) => {
+  const rawAmount =
+    Number(
+      transaction.amount
+    );
+
+  const displayAmount =
+    transaction.currency_code ===
+    'IRR'
+      ? irrToToman(
+          rawAmount
+        )
+      : rawAmount;
+
+  return {
+    id:
+      `TX-${transaction.id}`,
+
+    backendId:
+      Number(
+        transaction.id
+      ),
+
+    date:
+      transaction.transaction_date,
+
+    type:
+      transaction.transaction_type,
+
+    title:
+      transaction.description ||
+      transaction.transaction_type,
+
+    accountId:
+      Number(
+        transaction.account
+      ),
+
+    accountName:
+      transaction.account_name,
+
+    currencyCode:
+      transaction.currency_code,
+
+    direction:
+      transaction.direction,
+
+    amount:
+      transaction.direction === 'OUT'
+        ? -displayAmount
+        : displayAmount,
+
+    referenceType:
+      transaction.reference_type ||
+      '',
+
+    referenceId:
+      transaction.reference_id ==
+      null
+        ? null
+        : Number(
+            transaction.reference_id
+          ),
+  };
+};
+
+const mapExchangeFromApi = (
+  exchange,
+) => {
+  const fromAmountRaw =
+    Number(
+      exchange.from_amount
+    );
+
+  const toAmountRaw =
+    Number(
+      exchange.to_amount
+    );
+
+  const fromAmount =
+    exchange.from_currency_code ===
+    'IRR'
+      ? irrToToman(
+          fromAmountRaw
+        )
+      : fromAmountRaw;
+
+  const toAmount =
+    exchange.to_currency_code ===
+    'IRR'
+      ? irrToToman(
+          toAmountRaw
+        )
+      : toAmountRaw;
+
+  const rateToman =
+    exchange.from_currency_code ===
+      'IRR' &&
+    exchange.to_currency_code ===
+      'CAD' &&
+    toAmountRaw > 0
+      ? irrToToman(
+          fromAmountRaw
+        ) / toAmountRaw
+      : (
+          exchange.from_currency_code ===
+            'CAD' &&
+          exchange.to_currency_code ===
+            'IRR' &&
+          fromAmountRaw > 0
+        )
+        ? irrToToman(
+            toAmountRaw
+          ) / fromAmountRaw
+        : 0;
+
+  return {
+    id:
+      `EX-${exchange.id}`,
+
+    backendId:
+      Number(
+        exchange.id
+      ),
+
+    partner:
+      exchange
+        .exchange_partner_name,
+
+    date:
+      exchange.exchange_date,
+
+    fromAccountId:
+      Number(
+        exchange.from_account
+      ),
+
+    fromAccountName:
+      exchange.from_account_name,
+
+    toAccountId:
+      Number(
+        exchange.to_account
+      ),
+
+    toAccountName:
+      exchange.to_account_name,
+
+    fromCurrencyCode:
+      exchange.from_currency_code,
+
+    toCurrencyCode:
+      exchange.to_currency_code,
+
+    fromAmount,
+
+    toAmount,
+
+    irrPaid:
+      exchange.from_currency_code ===
+      'IRR'
+        ? fromAmount
+        : (
+            exchange.to_currency_code ===
+            'IRR'
+          )
+          ? toAmount
+          : 0,
+
+    cadReceived:
+      exchange.to_currency_code ===
+      'CAD'
+        ? toAmount
+        : (
+            exchange.from_currency_code ===
+            'CAD'
+          )
+          ? fromAmount
+          : 0,
+
+    rateToman,
+
+    notes:
+      exchange.notes || '',
+  };
+};
 
 const mapTransferFromApi = (transfer) => ({
   id: transfer.id,
@@ -193,10 +407,13 @@ const mapSaleFromApi = (
 
     date: sale.sale_date,
 
-    /*
-     * Backend = IRR
-     * Frontend = Toman
-     */
+    cadRateToman:
+    sale.cad_rate_irr_per_cad ==
+    null
+      ? null
+      : irrToToman(
+          sale.cad_rate_irr_per_cad
+        ),
     total: irrToToman(
       sale.total_amount
     ),
@@ -238,10 +455,153 @@ const mapSaleFromApi = (
           irrToToman(
             item.line_total_irr
           ),
+          unitCostCADSnapshot:
+          Number(
+            item.unit_cost_cad_snapshot
+          ),
+
+        lineCogsCAD:
+          Number(
+            item.line_cogs_cad
+          ),
+
+        lineCogsToman:
+          item.line_cogs_irr == null
+            ? null
+            : irrToToman(
+                item.line_cogs_irr
+              ),
       }),
     ),
   };
 };
+
+const mapPurchaseFromApi = (
+  purchase,
+) => ({
+  id:
+    purchase.purchase_number,
+
+  backendId:
+    Number(
+      purchase.id
+    ),
+
+  supplierId:
+    Number(
+      purchase.supplier
+    ),
+
+  supplierName:
+    purchase.supplier_name,
+
+  warehouseId:
+    Number(
+      purchase.warehouse
+    ),
+
+  warehouseName:
+    purchase.warehouse_name,
+
+  date:
+    purchase.purchase_date,
+
+  cadRateToman:
+    irrToToman(
+      purchase.irr_per_cad
+    ),
+
+  subtotalCAD:
+    Number(
+      purchase.subtotal_cad
+    ),
+
+  extraCostsToman:
+    irrToToman(
+      purchase.extra_costs_irr
+    ),
+
+  extraCostsCAD:
+    Number(
+      purchase.extra_costs_cad
+    ),
+
+  totalLandedCAD:
+    Number(
+      purchase.total_landed_cad
+    ),
+
+  items:
+    (
+      purchase.items || []
+    ).map(
+      (item) => ({
+        id:
+          Number(
+            item.id
+          ),
+
+        productId:
+          Number(
+            item.product
+          ),
+
+        productName:
+          item.product_name,
+
+        qty:
+          Number(
+            item.quantity
+          ),
+
+        unitCostCAD:
+          Number(
+            item.unit_cost
+          ),
+
+        landedUnitCostCAD:
+          Number(
+            item.landed_cost_per_unit
+          ),
+
+        lineTotalCAD:
+          Number(
+            item.line_total
+          ),
+      }),
+    ),
+
+  payments:
+    (
+      purchase.payments || []
+    ).map(
+      (payment) => ({
+        id:
+          Number(
+            payment.id
+          ),
+
+        accountId:
+          Number(
+            payment.account
+          ),
+
+        accountName:
+          payment.account_name,
+
+        amount:
+          Number(
+            payment.amount
+          ),
+
+        currencyCode:
+          payment.currency_code,
+
+        paymentType:
+          payment.payment_type,
+      }),
+    ),
+});
 
 const buildProductsFromApi = (
   apiProducts,
@@ -395,6 +755,69 @@ const buildProductsFromApi = (
   });
 };
 
+const buildAccountSummary = (
+  financialAccounts,
+  exchanges,
+  fallbackRate = 0,
+) => {
+  const activeAccounts =
+    financialAccounts.filter(
+      (account) =>
+        account.isActive
+    );
+
+  const irrBalance =
+    activeAccounts
+      .filter(
+        (account) =>
+          account.currencyCode ===
+          'IRR'
+      )
+      .reduce(
+        (sum, account) =>
+          sum +
+          Number(
+            account.currentBalance
+          ),
+        0
+      );
+
+  const cadBalance =
+    activeAccounts
+      .filter(
+        (account) =>
+          account.currencyCode ===
+          'CAD'
+      )
+      .reduce(
+        (sum, account) =>
+          sum +
+          Number(
+            account.currentBalance
+          ),
+        0
+      );
+
+  const latestRate =
+    exchanges.find(
+      (exchange) =>
+        exchange.rateToman > 0
+    )?.rateToman;
+
+  return {
+    irrBalance,
+
+    cadBalance,
+
+    cadRate:
+      latestRate ||
+      Number(
+        fallbackRate
+      ) ||
+      0,
+  };
+};
+
 export function ERPProvider({ children }) {
   const { user } = useAuth();
 
@@ -479,6 +902,71 @@ export function ERPProvider({ children }) {
     isStoreManager,
     roleCode,
   ]);
+
+  const refreshFinance =
+  useCallback(async () => {
+    if (!roleCode) {
+      return;
+    }
+
+    const apiAccounts =
+      await getFinancialAccounts();
+
+    const financialAccounts =
+      apiAccounts.map(
+        mapFinancialAccountFromApi
+      );
+
+    let transactions = [];
+    let exchanges = [];
+
+  
+    if (isStoreManager) {
+      const [
+        apiTransactions,
+        apiExchanges,
+      ] = await Promise.all([
+        getAccountTransactions(),
+        getCurrencyExchanges(),
+      ]);
+
+      transactions =
+        apiTransactions.map(
+          mapTransactionFromApi
+        );
+
+      exchanges =
+        apiExchanges.map(
+          mapExchangeFromApi
+        );
+    }
+
+    setData((prev) => ({
+      ...prev,
+
+      financialAccounts,
+
+      transactions:
+        isStoreManager
+          ? transactions
+          : [],
+
+      exchanges:
+        isStoreManager
+          ? exchanges
+          : [],
+
+          accounts:
+          buildAccountSummary(
+            financialAccounts,
+            exchanges,
+            0
+          ),
+    }));
+  }, [
+    roleCode,
+    isStoreManager,
+  ]);
   
   
 
@@ -488,6 +976,24 @@ export function ERPProvider({ children }) {
       JSON.stringify(data),
     );
   }, [data]);
+  useEffect(() => {
+    if (!roleCode) {
+      return;
+    }
+  
+    refreshFinance().catch(
+      (error) => {
+        console.error(
+          'Failed to load finance:',
+          error,
+        );
+      },
+    );
+  
+  }, [
+    roleCode,
+    refreshFinance,
+  ]);
 
   useEffect(() => {
     if (!canUseSales) {
@@ -614,35 +1120,92 @@ export function ERPProvider({ children }) {
     if (!canUsePurchases) {
       setData((prev) => ({
         ...prev,
+  
         suppliers: [],
+        purchases: [],
       }));
+  
       return;
     }
-
-    async function loadSuppliers() {
+  
+    async function loadPurchasingData() {
       try {
-        const apiSuppliers =
-          await getSuppliers();
-
+        const [
+          apiSuppliers,
+          apiPurchases,
+        ] = await Promise.all([
+          getSuppliers(),
+          getPurchases(),
+        ]);
+  
+        const purchases =
+          apiPurchases
+            .map(
+              mapPurchaseFromApi
+            )
+            .sort(
+              (a, b) =>
+                b.backendId -
+                a.backendId
+            );
+  
         const suppliers =
           apiSuppliers.map(
-            mapSupplierFromApi,
+            (supplier) => {
+              const base =
+                mapSupplierFromApi(
+                  supplier
+                );
+  
+              const supplierPurchases =
+                purchases.filter(
+                  (purchase) =>
+                    purchase.supplierId ===
+                    Number(
+                      supplier.id
+                    )
+                );
+  
+              return {
+                ...base,
+  
+                purchaseCount:
+                  supplierPurchases.length,
+  
+                totalPurchaseCAD:
+                  supplierPurchases.reduce(
+                    (
+                      sum,
+                      purchase
+                    ) =>
+                      sum +
+                      purchase.subtotalCAD,
+                    0
+                  ),
+              };
+            }
           );
-
+  
         setData((prev) => ({
           ...prev,
+  
           suppliers,
+          purchases,
         }));
+  
       } catch (error) {
         console.error(
-          'Failed to load suppliers from Django API:',
+          'Failed to load purchasing data:',
           error,
         );
       }
     }
-
-    loadSuppliers();
-  }, [canUsePurchases]);
+  
+    loadPurchasingData();
+  
+  }, [
+    canUsePurchases,
+  ]);
 
   useEffect(() => {
     if (!roleCode) {
@@ -723,45 +1286,47 @@ export function ERPProvider({ children }) {
               ),
           }));
   
-      await createProduct({
-        name:
-          payload.name.trim(),
-  
-        sku:
-          normalizedSku,
-  
-        category_name:
-          payload.category.trim(),
-  
-        brand_name:
-          payload.brand.trim(),
-  
-        sales_price_irr:
-          tomanToIrr(
-            payload.priceToman
-          ),
-  
-        default_cost_cad:
-          Number(
-            payload.costCAD
-          ) || 0,
-  
-        reorder_level:
-          Number(
-            payload.minStock
-          ) || 0,
-  
-        opening_stocks:
-          openingStocks,
-      });
-  
-      await refreshInventory();
-  
-      return {
-        ok: true,
-        message:
-          'کالا و موجودی اولیه با موفقیت ثبت شد.',
-      };
+          await createProduct({
+            name:
+              payload.name.trim(),
+          
+            sku:
+              normalizedSku,
+          
+            category_name:
+              payload.category.trim(),
+          
+            brand_name:
+              payload.brand.trim(),
+          
+            sales_price_irr:
+              tomanToIrr(
+                payload.priceToman
+              ),
+          
+            default_cost_cad:
+              Number(
+                payload.costCAD
+              ) || 0,
+          
+            reorder_level:
+              Number(
+                payload.minStock
+              ) || 0,
+          
+            opening_stocks:
+              openingStocks,
+          });
+          
+          await refreshInventory();
+
+          return {
+            ok: true,
+            message:
+              'کالا و موجودی اولیه با موفقیت ثبت شد.',
+          };
+            
+      
     } catch (error) {
       console.error(
         'Failed to create product:',
@@ -1022,7 +1587,14 @@ export function ERPProvider({ children }) {
             new Date()
               .toISOString()
               .slice(0, 10),
-  
+              cad_rate_irr_per_cad:
+              Number(
+                data.accounts?.cadRate
+              ) > 0
+                ? tomanToIrr(
+                    data.accounts.cadRate
+                  )
+                : null,
           items:
             normalizedItems,
   
@@ -1129,7 +1701,9 @@ export function ERPProvider({ children }) {
       }));
   
       await refreshInventory();
-  
+
+      await refreshFinance();
+
       return {
         ok: true,
         message:
@@ -1151,138 +1725,370 @@ export function ERPProvider({ children }) {
     }
   };
 
-  const recordPurchase = ({ supplierId, warehouse, items, shippingIRR, customsIRR, taxIRR, otherIRR, discountIRR }) => {
-    const supplier = data.suppliers.find((item) => item.id === Number(supplierId));
-    if (!supplier) return { ok: false, message: 'تأمین‌کننده معتبر انتخاب نشده است.' };
-    if (!['w1', 'w2'].includes(warehouse)) return { ok: false, message: 'انبار مقصد معتبر نیست.' };
-    if (!items.length) return { ok: false, message: 'حداقل یک ردیف کالا ثبت کنید.' };
+  const recordPurchase =
+  async ({
+    supplierId,
+    warehouseId,
 
-    const normalizedItems = items.map((item) => ({
-      productId: Number(item.productId),
-      qty: Number(item.qty),
-      unitCostCAD: Number(item.unitCostCAD),
-    }));
+    items,
 
-    for (const item of normalizedItems) {
-      if (!data.products.some((product) => product.id === item.productId)) {
-        return { ok: false, message: 'یکی از کالاهای خرید معتبر نیست.' };
-      }
-      if (item.qty <= 0 || item.unitCostCAD < 0) {
-        return { ok: false, message: 'تعداد و قیمت خرید باید معتبر باشند.' };
-      }
-    }
+    cadRateToman,
 
-    const subtotalCAD = normalizedItems.reduce((sum, item) => sum + item.qty * item.unitCostCAD, 0);
-    const extraCostsIRR = Math.max(
-      0,
-      (Number(shippingIRR) || 0) +
-        (Number(customsIRR) || 0) +
-        (Number(taxIRR) || 0) +
-        (Number(otherIRR) || 0) -
-        (Number(discountIRR) || 0),
-    );
+    shippingToman,
+    customsToman,
+    taxToman,
+    otherToman,
+    discountToman,
 
-    if (data.accounts.cadBalance < subtotalCAD) {
-      return { ok: false, message: 'موجودی حساب CAD برای مبلغ خرید کافی نیست.' };
-    }
-    if (data.accounts.irrBalance < extraCostsIRR) {
-      return { ok: false, message: 'موجودی ریالی برای هزینه‌های جانبی کافی نیست.' };
-    }
+    purchaseAccountId,
+    costAccountId,
+  }) => {
 
-    const purchaseId = `PUR-${5000 + data.purchases.length + 1}`;
-    const date = nowISO();
-    const extraCostsCAD = extraCostsIRR / data.accounts.cadRate;
-
-    setData((prev) => {
-      const purchaseItems = normalizedItems.map((line) => {
-        const product = prev.products.find((item) => item.id === line.productId);
-        const lineSubtotal = line.qty * line.unitCostCAD;
-        const share = subtotalCAD > 0 ? lineSubtotal / subtotalCAD : 1 / normalizedItems.length;
-        const allocatedExtraCAD = extraCostsCAD * share;
-        const landedUnitCostCAD = line.qty > 0 ? (lineSubtotal + allocatedExtraCAD) / line.qty : 0;
-        return {
-          ...line,
-          productName: product?.name ?? 'کالای حذف‌شده',
-          landedUnitCostCAD,
-        };
-      });
-
-      const updatedProducts = prev.products.map((product) => {
-        const line = purchaseItems.find((item) => item.productId === product.id);
-        if (!line) return product;
-        const currentQty = product.qtyW1 + product.qtyW2;
-        const newTotalQty = currentQty + line.qty;
-        const weightedCost = newTotalQty > 0
-          ? (currentQty * product.costCAD + line.qty * line.landedUnitCostCAD) / newTotalQty
-          : line.landedUnitCostCAD;
-        return {
-          ...product,
-          qtyW1: warehouse === 'w1' ? product.qtyW1 + line.qty : product.qtyW1,
-          qtyW2: warehouse === 'w2' ? product.qtyW2 + line.qty : product.qtyW2,
-          costCAD: weightedCost,
-        };
-      });
-
-      const purchase = {
-        id: purchaseId,
-        supplierId: supplier.id,
-        supplierName: supplier.name,
-        date,
-        warehouse,
-        subtotalCAD,
-        extraCostsIRR,
-        totalLandedIRR: subtotalCAD * prev.accounts.cadRate + extraCostsIRR,
-        items: purchaseItems,
-      };
-
-      const updatedSuppliers = prev.suppliers.map((item) =>
-        item.id === supplier.id
-          ? {
-              ...item,
-              purchaseCount: item.purchaseCount + 1,
-              totalPurchaseCAD: item.totalPurchaseCAD + subtotalCAD,
-            }
-          : item,
+    const supplier =
+      data.suppliers.find(
+        (item) =>
+          Number(item.id) ===
+          Number(supplierId)
       );
 
-      const transactions = [
-        {
-          id: makeId('TX-CAD'),
-          date,
-          type: 'purchase',
-          title: `پرداخت خرید ${purchaseId}`,
-          account: 'CAD',
-          amount: -subtotalCAD,
-        },
-        ...(extraCostsIRR > 0
-          ? [
-              {
-                id: makeId('TX-IRR'),
-                date,
-                type: 'expense',
-                title: `هزینه‌های جانبی ${purchaseId}`,
-                account: 'IRR',
-                amount: -extraCostsIRR,
-              },
-            ]
-          : []),
-      ];
+    if (!supplier) {
+      return {
+        ok: false,
+        message:
+          'تأمین‌کننده معتبر انتخاب نشده است.',
+      };
+    }
+
+    if (!warehouseId) {
+      return {
+        ok: false,
+        message:
+          'انبار مقصد را انتخاب کنید.',
+      };
+    }
+
+    if (
+      !items ||
+      !items.length
+    ) {
+      return {
+        ok: false,
+        message:
+          'حداقل یک ردیف کالا ثبت کنید.',
+      };
+    }
+
+    const rateToman =
+      Number(
+        cadRateToman
+      );
+
+    if (
+      !Number.isFinite(
+        rateToman
+      ) ||
+      rateToman <= 0
+    ) {
+      return {
+        ok: false,
+        message:
+          'نرخ CAD معتبر نیست.',
+      };
+    }
+
+    if (!purchaseAccountId) {
+      return {
+        ok: false,
+        message:
+          'حساب پرداخت CAD را انتخاب کنید.',
+      };
+    }
+
+    const normalizedItems =
+      items.map(
+        (item) => ({
+          product:
+            Number(
+              item.productId
+            ),
+
+          quantity:
+            Number(
+              item.qty
+            ),
+
+          unit_cost_cad:
+            Number(
+              item.unitCostCAD
+            ),
+        })
+      );
+
+    for (
+      const item
+      of normalizedItems
+    ) {
+      if (!item.product) {
+        return {
+          ok: false,
+          message:
+            'کالای یکی از ردیف‌ها معتبر نیست.',
+        };
+      }
+
+      if (
+        !Number.isFinite(
+          item.quantity
+        ) ||
+        item.quantity <= 0
+      ) {
+        return {
+          ok: false,
+          message:
+            'تعداد خرید باید بیشتر از صفر باشد.',
+        };
+      }
+
+      if (
+        !Number.isFinite(
+          item.unit_cost_cad
+        ) ||
+        item.unit_cost_cad <= 0
+      ) {
+        return {
+          ok: false,
+          message:
+            'قیمت خرید باید بیشتر از صفر باشد.',
+        };
+      }
+    }
+
+    const grossExtrasToman =
+      (
+        Number(
+          shippingToman
+        ) || 0
+      ) +
+      (
+        Number(
+          customsToman
+        ) || 0
+      ) +
+      (
+        Number(
+          taxToman
+        ) || 0
+      ) +
+      (
+        Number(
+          otherToman
+        ) || 0
+      );
+
+    const discountValue =
+      Number(
+        discountToman
+      ) || 0;
+
+    if (
+      discountValue < 0
+    ) {
+      return {
+        ok: false,
+        message:
+          'تخفیف نمی‌تواند منفی باشد.',
+      };
+    }
+
+    if (
+      discountValue >
+      grossExtrasToman
+    ) {
+      return {
+        ok: false,
+        message:
+          'تخفیف نمی‌تواند از هزینه‌های جانبی بیشتر باشد.',
+      };
+    }
+
+    const netExtraToman =
+      grossExtrasToman -
+      discountValue;
+
+    if (
+      netExtraToman > 0 &&
+      !costAccountId
+    ) {
+      return {
+        ok: false,
+        message:
+          'حساب ریالی هزینه‌های جانبی را انتخاب کنید.',
+      };
+    }
+
+    try {
+      const created =
+        await createPurchase({
+          supplier:
+            Number(
+              supplierId
+            ),
+
+          warehouse:
+            Number(
+              warehouseId
+            ),
+
+          purchase_date:
+            new Date()
+              .toISOString()
+              .slice(0, 10),
+
+          items:
+            normalizedItems,
+
+          irr_per_cad:
+            tomanToIrr(
+              rateToman
+            ),
+
+          shipping_cost_irr:
+            tomanToIrr(
+              Number(
+                shippingToman
+              ) || 0
+            ),
+
+          customs_cost_irr:
+            tomanToIrr(
+              Number(
+                customsToman
+              ) || 0
+            ),
+
+          tax_irr:
+            tomanToIrr(
+              Number(
+                taxToman
+              ) || 0
+            ),
+
+          other_costs_irr:
+            tomanToIrr(
+              Number(
+                otherToman
+              ) || 0
+            ),
+
+          overall_discount_irr:
+            tomanToIrr(
+              discountValue
+            ),
+
+          purchase_account:
+            Number(
+              purchaseAccountId
+            ),
+
+          cost_account:
+            netExtraToman > 0
+              ? Number(
+                  costAccountId
+                )
+              : null,
+
+          notes:
+            '',
+        });
+
+      const [
+        apiSuppliers,
+        apiPurchases,
+      ] = await Promise.all([
+        getSuppliers(),
+        getPurchases(),
+      ]);
+
+      const purchases =
+        apiPurchases
+          .map(
+            mapPurchaseFromApi
+          )
+          .sort(
+            (a, b) =>
+              b.backendId -
+              a.backendId
+          );
+
+      const suppliers =
+        apiSuppliers.map(
+          (supplierRow) => {
+            const base =
+              mapSupplierFromApi(
+                supplierRow
+              );
+
+            const supplierPurchases =
+              purchases.filter(
+                (purchase) =>
+                  purchase.supplierId ===
+                  Number(
+                    supplierRow.id
+                  )
+              );
+
+            return {
+              ...base,
+
+              purchaseCount:
+                supplierPurchases.length,
+
+              totalPurchaseCAD:
+                supplierPurchases.reduce(
+                  (
+                    sum,
+                    purchase
+                  ) =>
+                    sum +
+                    purchase.subtotalCAD,
+                  0
+                ),
+            };
+          }
+        );
+
+      setData((prev) => ({
+        ...prev,
+
+        suppliers,
+        purchases,
+      }));
+
+      await refreshInventory();
+
+      await refreshFinance();
 
       return {
-        ...prev,
-        products: updatedProducts,
-        suppliers: updatedSuppliers,
-        purchases: [purchase, ...prev.purchases],
-        accounts: {
-          ...prev.accounts,
-          cadBalance: prev.accounts.cadBalance - subtotalCAD,
-          irrBalance: prev.accounts.irrBalance - extraCostsIRR,
-        },
-        transactions: [...transactions, ...prev.transactions],
-      };
-    });
+        ok: true,
 
-    return { ok: true, message: `خرید ${purchaseId} و بهای تمام‌شده ثبت شد.` };
+        message:
+          `خرید ${created.purchase_number} ثبت و وارد انبار شد.`,
+      };
+
+    } catch (error) {
+      console.error(
+        'Failed to create purchase:',
+        error,
+      );
+
+      return {
+        ok: false,
+
+        message:
+          error.message ||
+          'ثبت خرید انجام نشد.',
+      };
+    }
   };
 
   const transferStock = async (
@@ -1458,55 +2264,372 @@ export function ERPProvider({ children }) {
       };
     }
   };
+  const addFinancialAccount =
+  async (payload) => {
+    if (!isStoreManager) {
+      return {
+        ok: false,
+        message:
+          'فقط مدیر فروشگاه اجازه ایجاد حساب مالی دارد.',
+      };
+    }
 
-  const recordExchange = ({ partner, irrPaid, cadReceived }) => {
-    const paid = Number(irrPaid);
-    const received = Number(cadReceived);
-    if (!partner.trim()) return { ok: false, message: 'نام صراف یا طرف معامله الزامی است.' };
-    if (paid <= 0 || received <= 0) return { ok: false, message: 'مبالغ تبدیل باید بیشتر از صفر باشند.' };
-    if (data.accounts.irrBalance < paid) return { ok: false, message: 'موجودی حساب ریالی کافی نیست.' };
+    const name =
+      payload.name?.trim();
 
-    const date = nowISO();
-    const exchange = {
-      id: `EX-${9000 + data.exchanges.length + 1}`,
-      partner: partner.trim(),
-      date,
-      irrPaid: paid,
-      cadReceived: received,
-      rate: paid / received,
-    };
+    const accountType =
+      payload.accountType;
 
-    setData((prev) => ({
-      ...prev,
-      exchanges: [exchange, ...prev.exchanges],
-      accounts: {
-        ...prev.accounts,
-        irrBalance: prev.accounts.irrBalance - paid,
-        cadBalance: prev.accounts.cadBalance + received,
-        cadRate: exchange.rate,
-      },
-      transactions: [
-        {
-          id: makeId('TX-EX-IRR'),
-          date,
-          type: 'exchange',
-          title: `خرید ارز از ${exchange.partner}`,
-          account: 'IRR',
-          amount: -paid,
-        },
-        {
-          id: makeId('TX-EX-CAD'),
-          date,
-          type: 'exchange',
-          title: `افزایش موجودی CAD از ${exchange.partner}`,
-          account: 'CAD',
-          amount: received,
-        },
-        ...prev.transactions,
-      ],
-    }));
+    const currencyCode =
+      payload.currencyCode;
 
-    return { ok: true, message: 'تبدیل ارز ثبت و حساب‌ها به‌روزرسانی شدند.' };
+    const openingBalance =
+      Number(
+        payload.openingBalance
+      ) || 0;
+
+    if (!name) {
+      return {
+        ok: false,
+        message:
+          'نام حساب الزامی است.',
+      };
+    }
+
+    if (
+      ![
+        'BANK',
+        'CASH',
+      ].includes(
+        accountType
+      )
+    ) {
+      return {
+        ok: false,
+        message:
+          'نوع حساب معتبر نیست.',
+      };
+    }
+
+    if (
+      ![
+        'IRR',
+        'CAD',
+      ].includes(
+        currencyCode
+      )
+    ) {
+      return {
+        ok: false,
+        message:
+          'ارز حساب معتبر نیست.',
+      };
+    }
+
+    if (
+      openingBalance < 0
+    ) {
+      return {
+        ok: false,
+        message:
+          'مانده اولیه نمی‌تواند منفی باشد.',
+      };
+    }
+
+    try {
+      await createFinancialAccountApi({
+        name,
+
+        account_type:
+          accountType,
+
+        currency_code:
+          currencyCode,
+
+        opening_balance:
+          currencyCode === 'IRR'
+            ? tomanToIrr(
+                openingBalance
+              )
+            : openingBalance,
+
+        is_active:
+          true,
+      });
+
+      await refreshFinance();
+
+      return {
+        ok: true,
+        message:
+          'حساب مالی با موفقیت ایجاد شد.',
+      };
+
+    } catch (error) {
+      console.error(
+        'Failed to create financial account:',
+        error,
+      );
+
+      return {
+        ok: false,
+        message:
+          error.message ||
+          'ایجاد حساب مالی انجام نشد.',
+      };
+    }
+  };
+
+  const updateFinancialAccount =
+  async (
+    accountId,
+    payload,
+  ) => {
+    if (!isStoreManager) {
+      return {
+        ok: false,
+        message:
+          'فقط مدیر فروشگاه اجازه تغییر حساب مالی دارد.',
+      };
+    }
+
+    const apiPayload = {};
+
+    if (
+      payload.name !==
+      undefined
+    ) {
+      apiPayload.name =
+        payload.name.trim();
+    }
+
+    if (
+      payload.accountType !==
+      undefined
+    ) {
+      apiPayload.account_type =
+        payload.accountType;
+    }
+
+    if (
+      payload.isActive !==
+      undefined
+    ) {
+      apiPayload.is_active =
+        Boolean(
+          payload.isActive
+        );
+    }
+
+    try {
+      await updateFinancialAccountApi(
+        accountId,
+        apiPayload,
+      );
+
+      await refreshFinance();
+
+      return {
+        ok: true,
+        message:
+          'حساب مالی به‌روزرسانی شد.',
+      };
+
+    } catch (error) {
+      console.error(
+        'Failed to update financial account:',
+        error,
+      );
+
+      return {
+        ok: false,
+        message:
+          error.message ||
+          'به‌روزرسانی حساب انجام نشد.',
+      };
+    }
+  };
+
+  const recordExchange =
+  async ({
+    partner,
+
+    fromAccountId,
+    toAccountId,
+
+    irrPaid,
+    cadReceived,
+  }) => {
+    if (!isStoreManager) {
+      return {
+        ok: false,
+        message:
+          'فقط مدیر فروشگاه اجازه ثبت تبدیل ارز دارد.',
+      };
+    }
+
+    const normalizedPartner =
+      partner.trim();
+
+    const paidToman =
+      Number(
+        irrPaid
+      );
+
+    const receivedCad =
+      Number(
+        cadReceived
+      );
+
+    const fromAccount =
+      data.financialAccounts
+        ?.find(
+          (account) =>
+            Number(
+              account.id
+            ) ===
+            Number(
+              fromAccountId
+            )
+        );
+
+    const toAccount =
+      data.financialAccounts
+        ?.find(
+          (account) =>
+            Number(
+              account.id
+            ) ===
+            Number(
+              toAccountId
+            )
+        );
+
+    if (!normalizedPartner) {
+      return {
+        ok: false,
+        message:
+          'نام صراف یا طرف معامله الزامی است.',
+      };
+    }
+
+    if (
+      !fromAccount ||
+      !toAccount
+    ) {
+      return {
+        ok: false,
+        message:
+          'حساب مبدأ و مقصد را انتخاب کنید.',
+      };
+    }
+
+    if (
+      fromAccount.currencyCode !==
+      'IRR'
+    ) {
+      return {
+        ok: false,
+        message:
+          'حساب مبدأ باید IRR باشد.',
+      };
+    }
+
+    if (
+      toAccount.currencyCode !==
+      'CAD'
+    ) {
+      return {
+        ok: false,
+        message:
+          'حساب مقصد باید CAD باشد.',
+      };
+    }
+
+    if (
+      !Number.isFinite(
+        paidToman
+      ) ||
+      paidToman <= 0 ||
+      !Number.isFinite(
+        receivedCad
+      ) ||
+      receivedCad <= 0
+    ) {
+      return {
+        ok: false,
+        message:
+          'مبالغ تبدیل باید بیشتر از صفر باشند.',
+      };
+    }
+
+    if (
+      paidToman >
+      Number(
+        fromAccount.currentBalance
+      )
+    ) {
+      return {
+        ok: false,
+        message:
+          'موجودی حساب IRR کافی نیست.',
+      };
+    }
+
+    try {
+      const created =
+        await createCurrencyExchangeApi({
+          exchange_partner_name:
+            normalizedPartner,
+
+          exchange_date:
+            new Date()
+              .toISOString()
+              .slice(0, 10),
+
+          from_account:
+            Number(
+              fromAccountId
+            ),
+
+          to_account:
+            Number(
+              toAccountId
+            ),
+
+          from_amount:
+            tomanToIrr(
+              paidToman
+            ),
+
+          to_amount:
+            receivedCad,
+
+          notes:
+            '',
+        });
+
+      await refreshFinance();
+
+      return {
+        ok: true,
+        message:
+          `تبدیل ارز EX-${created.id} با موفقیت ثبت شد.`,
+      };
+
+    } catch (error) {
+      console.error(
+        'Failed to create currency exchange:',
+        error,
+      );
+
+      return {
+        ok: false,
+        message:
+          error.message ||
+          'ثبت تبدیل ارز انجام نشد.',
+      };
+    }
   };
 
   const settleCustomerDebt =
@@ -1576,11 +2699,7 @@ export function ERPProvider({ children }) {
           `تسویه بدهی ${customer.name}`,
       });
 
-      /*
-       * بعد از پرداخت دوباره
-       * داده واقعی Backend را بخوان.
-       */
-
+    
       const [
         apiCustomers,
         apiSales,
@@ -1653,22 +2772,24 @@ export function ERPProvider({ children }) {
           },
         );
 
-      setData((prev) => ({
-        ...prev,
-        customers,
-        sales,
-
-        financialAccounts:
-          apiAccounts.map(
-            mapFinancialAccountFromApi,
-          ),
-      }));
-
-      return {
-        ok: true,
-        message:
-          'پرداخت بدهی با موفقیت ثبت شد.',
-      };
+        setData((prev) => ({
+          ...prev,
+          customers,
+          sales,
+        
+          financialAccounts:
+            apiAccounts.map(
+              mapFinancialAccountFromApi,
+            ),
+        }));
+        
+        await refreshFinance();
+        
+        return {
+          ok: true,
+          message:
+            'پرداخت بدهی با موفقیت ثبت شد.',
+        };
 
     } catch (error) {
       console.error(
@@ -1687,20 +2808,54 @@ export function ERPProvider({ children }) {
 
   const resetDemo = () => {
     setData((prev) => {
-      const demo = cloneInitialData();
-
+      const demo =
+        cloneInitialData();
+  
       return {
         ...demo,
-
-        products: prev.products,
-        customers: prev.customers,
-        suppliers: prev.suppliers,
-        warehouses: prev.warehouses || [],
+  
+        products:
+          prev.products || [],
+  
+        customers:
+          prev.customers || [],
+  
+        suppliers:
+          prev.suppliers || [],
+  
+        purchases:
+          prev.purchases || [],
+  
+        sales:
+          prev.sales || [],
+  
+        warehouses:
+          prev.warehouses || [],
+  
         stockMovements:
           prev.stockMovements || [],
+  
         inventoryRecords:
           prev.inventoryRecords || [],
-        transfers: prev.transfers || [],
+  
+        transfers:
+          prev.transfers || [],
+  
+        financialAccounts:
+          prev.financialAccounts || [],
+  
+        transactions:
+          prev.transactions || [],
+  
+        exchanges:
+          prev.exchanges || [],
+  
+        accounts:
+          prev.accounts || {
+            irrBalance: 0,
+            cadBalance: 0,
+            cadRate: 0,
+          },
       };
     });
   };
@@ -1763,22 +2918,50 @@ export function ERPProvider({ children }) {
       },
     ).length;
     const totalPurchasesCAD = data.purchases.reduce((sum, item) => sum + item.subtotalCAD, 0);
-    const cogsIRR = data.sales.reduce((sum, sale) => {
-      return sum + sale.items.reduce((lineSum, line) => {
-        const product = data.products.find((item) => item.id === line.productId);
-        return lineSum + (product?.costCAD ?? 0) * data.accounts.cadRate * line.qty;
-      }, 0);
-    }, 0);
-    const grossProfit = totalSales - cogsIRR;
+    const cogsComplete =
+  data.sales.every(
+    (sale) =>
+      sale.items.every(
+        (line) =>
+          line.lineCogsToman != null
+      )
+  );
+
+const historicalCogsToman =
+  data.sales.reduce(
+    (sum, sale) =>
+      sum +
+      sale.items.reduce(
+        (lineSum, line) =>
+          lineSum +
+          (
+            line.lineCogsToman ??
+            0
+          ),
+        0
+      ),
+    0
+  );
+
+const grossProfit =
+  cogsComplete
+    ? totalSales -
+      historicalCogsToman
+    : null;
 
     return {
       totalSales,
       collectedSales,
       totalDebt,
+    
       inventoryCAD,
       inventoryUnits,
       lowStockCount,
+    
       totalPurchasesCAD,
+    
+      historicalCogsToman,
+      cogsComplete,
       grossProfit,
     };
   }, [data]);
@@ -1786,18 +2969,59 @@ export function ERPProvider({ children }) {
   const value = {
     ...data,
   
-    products: data.products,
-    warehouses: data.warehouses || [],
-    inventoryRecords: data.inventoryRecords || [],
-    transfers: data.transfers || [],
+    products:
+      data.products || [],
+  
+    customers:
+      data.customers || [],
+  
+    suppliers:
+      data.suppliers || [],
+  
+    sales:
+      data.sales || [],
+  
+    purchases:
+      data.purchases || [],
+  
+    warehouses:
+      data.warehouses || [],
+  
+    inventoryRecords:
+      data.inventoryRecords || [],
+  
+    transfers:
+      data.transfers || [],
+  
     stockMovements:
-     data.stockMovements || [],
+      data.stockMovements || [],
+  
+    financialAccounts:
+      data.financialAccounts || [],
+  
+    transactions:
+      data.transactions || [],
+  
+    exchanges:
+      data.exchanges || [],
+  
+    accounts:
+      data.accounts || {
+        irrBalance: 0,
+        cadBalance: 0,
+        cadRate: 0,
+      },
+  
     metrics,
   
     addProduct,
     addCustomer,
     addSupplier,
     addWarehouse,
+  
+    addFinancialAccount,
+    updateFinancialAccount,
+  
     recordSale,
     recordPurchase,
   
@@ -1805,6 +3029,8 @@ export function ERPProvider({ children }) {
     refreshInventory,
   
     recordExchange,
+    refreshFinance,
+  
     settleCustomerDebt,
   
     resetDemo,

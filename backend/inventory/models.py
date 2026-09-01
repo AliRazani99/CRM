@@ -40,15 +40,28 @@ class Inventory(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        self.qty_available = self.qty_on_hand - self.qty_reserved
+        self.qty_available = (
+            self.qty_on_hand
+            - self.qty_reserved
+        )
 
-        update_fields = kwargs.get("update_fields")
+        update_fields = kwargs.get(
+            "update_fields"
+        )
 
         if update_fields is not None:
-            kwargs["update_fields"] = set(update_fields) | {"qty_available"}
+            kwargs["update_fields"] = (
+                set(update_fields)
+                |
+                {
+                    "qty_available",
+                }
+            )
 
-        super().save(*args, **kwargs)
-
+        super().save(
+            *args,
+            **kwargs,
+        )
     def __str__(self):
         return f"{self.product} - {self.warehouse}"
 

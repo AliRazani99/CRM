@@ -240,7 +240,7 @@ export default function CustomersPage() {
           <Field label="مشتری">
             <select value={settleForm.customerId} onChange={(event) => {
               const customer = customers.find((item) => item.id === Number(event.target.value));
-              setSettleForm({ customerId: event.target.value, amount: customer?.debt ?? 0 });
+              setSettleForm((prev) => ({ ...prev, customerId: event.target.value, amount: customer?.debt ?? 0, }));
             }}>
               {customers.filter((customer) => customer.debt > 0).map((customer) => <option key={customer.id} value={customer.id}>{customer.name} — بدهی {formatToman(customer.debt)}</option>)}
             </select>

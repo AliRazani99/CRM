@@ -10,6 +10,7 @@ from .models import (
 )
 from .serializers import (
     AccountTransactionSerializer,
+    CurrencyExchangeCreateSerializer,
     CurrencyExchangeSerializer,
 )
 
@@ -17,14 +18,24 @@ from .serializers import (
 class CurrencyExchangeViewSet(
     viewsets.ModelViewSet
 ):
-    queryset = CurrencyExchange.objects.all()
-    serializer_class = (
-        CurrencyExchangeSerializer
+    queryset = (
+        CurrencyExchange.objects
+        .select_related(
+            "from_account",
+            "to_account",
+            "created_by_user",
+        )
+        .order_by(
+            "-exchange_date",
+            "-id",
+        )
     )
+
     permission_classes = [
         IsStoreManager,
     ]
 
+    # Financial history is immutable.
     http_method_names = [
         "get",
         "post",
@@ -32,14 +43,33 @@ class CurrencyExchangeViewSet(
         "options",
     ]
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return (
+                CurrencyExchangeCreateSerializer
+            )
+
+        return CurrencyExchangeSerializer
+
 
 class AccountTransactionViewSet(
     viewsets.ReadOnlyModelViewSet
 ):
-    queryset = AccountTransaction.objects.all()
+    queryset = (
+        AccountTransaction.objects
+        .select_related(
+            "account"
+        )
+        .order_by(
+            "-transaction_date",
+            "-id",
+        )
+    )
+
     serializer_class = (
         AccountTransactionSerializer
     )
+
     permission_classes = [
         IsStoreManager,
     ]
