@@ -1,10 +1,34 @@
-import client from './client';
+import {
+  apiRequest,
+} from './client';
 
-export async function createSale(payload) {
-  const response = await client.post(
-    '/sales/',
-    payload
+
+export function getSales() {
+  return apiRequest(
+    '/sales/sales/'
   );
+}
 
-  return response.data;
+
+export function createSale(payload) {
+  return apiRequest(
+    '/sales/sales/',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+
+export function settleCustomerDebtApi(
+  payload,
+) {
+  return apiRequest(
+    '/sales/payments/settle-customer/',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
 }

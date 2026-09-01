@@ -35,3 +35,9 @@ export function createSupplier(supplier) {
     }),
   });
 }
+
+export function getFinancialAccounts() {
+  return apiRequest(
+    '/financial-accounts/'
+  );
+}

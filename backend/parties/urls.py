@@ -4,6 +4,7 @@ from .views import (
     CustomerViewSet,
     SupplierViewSet,
     WarehouseViewSet,
+    FinancialAccountViewSet,
 )
 
 
@@ -25,6 +26,12 @@ router.register(
     "warehouses",
     WarehouseViewSet,
     basename="warehouse",
+)
+
+router.register(
+    "financial-accounts",
+    FinancialAccountViewSet,
+    basename="financial-account",
 )
 
 urlpatterns = router.urls

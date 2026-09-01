@@ -1,6 +1,7 @@
 from rest_framework import viewsets
 
 from accounts.permissions import (
+    IsOperationalUser,
     IsStoreOrPurchaseManager,
     IsStoreOrSalesManager,
     OperationalReadOnlyStoreWrite,
@@ -10,11 +11,14 @@ from .models import (
     Customer,
     Supplier,
     Warehouse,
+    FinancialAccount,
 )
+
 from .serializers import (
     CustomerSerializer,
     SupplierSerializer,
     WarehouseSerializer,
+    FinancialAccountSerializer,
 )
 
 
@@ -48,4 +52,21 @@ class WarehouseViewSet(
 
     permission_classes = [
         OperationalReadOnlyStoreWrite,
+    ]
+
+class FinancialAccountViewSet(
+    viewsets.ReadOnlyModelViewSet
+):
+    queryset = (
+        FinancialAccount.objects
+        .filter(is_active=True)
+        .order_by("id")
+    )
+
+    serializer_class = (
+        FinancialAccountSerializer
+    )
+
+    permission_classes = [
+        IsOperationalUser,
     ]

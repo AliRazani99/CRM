@@ -1,5 +1,12 @@
 from django.db import transaction
 from rest_framework import viewsets
+from django.core.exceptions import (
+    ValidationError as DjangoValidationError,
+)
+
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
 
 from accounts.permissions import (
     IsStoreOrSalesManager,
@@ -13,26 +20,44 @@ from .models import (
 )
 from .serializers import (
     CustomerReceivableSerializer,
+    CustomerSettlementSerializer,
     PaymentSerializer,
+    SaleCreateSerializer,
     SaleItemSerializer,
     SaleSerializer,
 )
+
 from .services import (
-    recalculate_sale,
     decrease_inventory_for_sale,
+    recalculate_sale,
+    settle_customer_debt,
 )
-class SaleViewSet(viewsets.ModelViewSet):
-    queryset = Sale.objects.all()
-    serializer_class = SaleSerializer
+
+class SaleViewSet(
+    viewsets.ModelViewSet
+):
+    queryset = (
+        Sale.objects
+        .select_related(
+            "customer",
+            "created_by_user",
+        )
+        .prefetch_related(
+            "items",
+            "payments",
+        )
+        .order_by("-id")
+    )
+
     permission_classes = [
         IsStoreOrSalesManager,
     ]
 
-    def perform_create(self, serializer):
-        serializer.save(
-            created_by_user=self.request.user,
-        )
+    def get_serializer_class(self):
+        if self.action == "create":
+            return SaleCreateSerializer
 
+        return SaleSerializer
 
 class SaleItemViewSet(viewsets.ModelViewSet):
     queryset = SaleItem.objects.all()
@@ -83,7 +108,54 @@ class PaymentViewSet(viewsets.ModelViewSet):
         "head",
         "options",
     ]
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="settle-customer",
+    )
+    def settle_customer(
+        self,
+        request,
+    ):
+        serializer = (
+            CustomerSettlementSerializer(
+                data=request.data,
+                context={
+                    "request": request,
+                },
+            )
+        )
 
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        try:
+            payments = settle_customer_debt(
+                **serializer.validated_data
+            )
+
+        except DjangoValidationError as exc:
+            from rest_framework.exceptions import (
+                ValidationError,
+            )
+
+            raise ValidationError(
+                exc.messages
+            )
+
+        return Response(
+            {
+                "ok": True,
+                "payments": (
+                    PaymentSerializer(
+                        payments,
+                        many=True,
+                    ).data
+                ),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 class CustomerReceivableViewSet(
     viewsets.ReadOnlyModelViewSet
