@@ -29,3 +29,10 @@ export const formatDate = (value) => {
 export const nowISO = () => new Date().toISOString();
 
 export const makeId = (prefix) => `${prefix}-${Date.now().toString().slice(-8)}`;
+
+export const irrToToman = (value = 0) =>
+  (Number(value) || 0) / 10;
+
+
+export const tomanToIrr = (value = 0) =>
+  (Number(value) || 0) * 10;

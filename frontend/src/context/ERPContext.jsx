@@ -1,14 +1,255 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { initialData } from '../data/initialData';
-import { makeId, nowISO } from '../utils/formatters';
-import { getCustomers } from '../api/parties';
+import {
+  irrToToman,
+  makeId,
+  nowISO,
+  tomanToIrr,
+} from '../utils/formatters';
+import {
+  createCustomer,
+  createSupplier,
+  getCustomers,
+  getSuppliers,
+} from '../api/parties';
+import {
+  createProduct,
+  getProducts,
+} from '../api/products';
+
+import {
+  createStockTransfer,
+  getInventory,
+  getStockTransfers,
+  getWarehouses,
+  createWarehouse,
+} from '../api/inventory';
+
+import {
+  useAuth,
+} from './AuthContext';
+
+import {
+  ROLE,
+} from '../auth/access';
 
 const STORAGE_KEY = 'nexus-erp-state-v1';
 const ERPContext = createContext(null);
 
 const cloneInitialData = () => JSON.parse(JSON.stringify(initialData));
 
+const mapSupplierFromApi = (supplier) => ({
+  id: supplier.id,
+  name: supplier.name,
+  country: supplier.country,
+  phone: supplier.phone,
+  email: supplier.email,
+  isActive: supplier.is_active,
+
+  purchaseCount: 0,
+  totalPurchaseCAD: 0,
+});
+
+const mapTransferFromApi = (transfer) => ({
+  id: transfer.id,
+
+  productId:
+    Number(transfer.product),
+
+  productName:
+    transfer.product_name,
+
+  qty:
+    Number(transfer.quantity),
+
+  fromWarehouseId:
+    Number(transfer.source_warehouse),
+
+  fromWarehouseName:
+    transfer.source_warehouse_name,
+
+  toWarehouseId:
+    Number(transfer.destination_warehouse),
+
+  toWarehouseName:
+    transfer.destination_warehouse_name,
+
+  date:
+    transfer.transfer_date,
+
+  notes:
+    transfer.notes || '',
+});
+
+
+const buildProductsFromApi = (
+  apiProducts,
+  apiInventory,
+  warehouses,
+) => {
+  return apiProducts.map((product) => {
+    const productInventory =
+      apiInventory
+        .filter(
+          (row) =>
+            Number(row.product) ===
+            Number(product.id)
+        )
+        .map((row) => ({
+          id: row.id,
+
+          warehouseId:
+            Number(row.warehouse),
+
+          warehouseName:
+            row.warehouse_name,
+
+          qtyOnHand:
+            Number(row.qty_on_hand),
+
+          qtyReserved:
+            Number(row.qty_reserved),
+
+          qtyAvailable:
+            Number(row.qty_available),
+
+          avgCostCAD:
+            Number(row.avg_cost_cad),
+        }));
+
+    const totalOnHand =
+      productInventory.reduce(
+        (sum, row) =>
+          sum + row.qtyOnHand,
+        0,
+      );
+
+    const totalReserved =
+      productInventory.reduce(
+        (sum, row) =>
+          sum + row.qtyReserved,
+        0,
+      );
+
+    const totalAvailable =
+      productInventory.reduce(
+        (sum, row) =>
+          sum + row.qtyAvailable,
+        0,
+      );
+
+    const inventoryValue =
+      productInventory.reduce(
+        (sum, row) =>
+          sum +
+          row.qtyOnHand *
+            row.avgCostCAD,
+        0,
+      );
+
+    const weightedCost =
+      totalOnHand > 0
+        ? inventoryValue / totalOnHand
+        : Number(
+            product.default_cost_cad
+          );
+
+    /*
+     * qtyW1 / qtyW2 را فعلاً نگه می‌داریم
+     * تا Sales/Purchases قدیمی نشکنند.
+     * بعداً آن صفحات را هم API-based می‌کنیم.
+     */
+    const firstWarehouse =
+      warehouses[0];
+
+    const secondWarehouse =
+      warehouses[1];
+
+    const firstInventory =
+      productInventory.find(
+        (row) =>
+          row.warehouseId ===
+          Number(firstWarehouse?.id),
+      );
+
+    const secondInventory =
+      productInventory.find(
+        (row) =>
+          row.warehouseId ===
+          Number(secondWarehouse?.id),
+      );
+
+    return {
+      id: product.id,
+
+      name: product.name,
+      sku: product.sku,
+
+      category:
+        product.category_name,
+
+      brand:
+        product.brand_name,
+
+      categoryId:
+        product.category,
+
+      brandId:
+        product.brand,
+
+      minStock:
+        Number(product.reorder_level),
+
+      costCAD:
+        weightedCost,
+
+      /*
+       * Backend = IRR
+       * Frontend = Toman
+       */
+      priceIRR:
+        irrToToman(
+          product.sales_price_irr
+        ),
+
+      isActive:
+        product.is_active,
+
+      inventories:
+        productInventory,
+
+      totalOnHand,
+      reserved:
+        totalReserved,
+
+      available:
+        totalAvailable,
+
+      qtyW1:
+        firstInventory?.qtyOnHand ?? 0,
+
+      qtyW2:
+        secondInventory?.qtyOnHand ?? 0,
+    };
+  });
+};
+
 export function ERPProvider({ children }) {
+  const { user } = useAuth();
+
+  const roleCode = user?.role_code ?? null;
+
+  const isStoreManager =
+    roleCode === ROLE.STORE_MANAGER;
+
+  const canUseSales =
+    roleCode === ROLE.STORE_MANAGER ||
+    roleCode === ROLE.SALES_MANAGER;
+
+  const canUsePurchases =
+    roleCode === ROLE.STORE_MANAGER ||
+    roleCode === ROLE.PURCHASE_MANAGER;
+
   const [data, setData] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -18,101 +259,388 @@ export function ERPProvider({ children }) {
     }
   });
 
+  const refreshInventory = useCallback(async () => {
+    if (!roleCode) {
+      return;
+    }
+
+    const [
+      apiProducts,
+      apiInventory,
+      apiWarehouses,
+      apiTransfers,
+    ] = await Promise.all([
+      getProducts(),
+      getInventory(),
+      getWarehouses(),
+      isStoreManager
+        ? getStockTransfers()
+        : Promise.resolve([]),
+    ]);
+
+    const products = buildProductsFromApi(
+      apiProducts,
+      apiInventory,
+      apiWarehouses,
+    );
+
+    const transfers = apiTransfers.map(
+      mapTransferFromApi,
+    );
+
+    setData((prev) => ({
+      ...prev,
+      products,
+      warehouses: apiWarehouses,
+      inventoryRecords: apiInventory,
+      transfers,
+    }));
+  }, [isStoreManager, roleCode]);
+
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(data),
+    );
   }, [data]);
+
   useEffect(() => {
+    if (!canUseSales) {
+      setData((prev) => ({
+        ...prev,
+        customers: [],
+      }));
+      return;
+    }
+
     async function loadCustomers() {
       try {
         const apiCustomers = await getCustomers();
-  
-        const customers = apiCustomers.map((customer) => ({
-          id: customer.id,
-          name: customer.full_name,
-          phone: customer.phone,
-          instagram: customer.instagram_handle,
-          postalCode: customer.postal_code,
-          address: customer.address,
-  
-          // فعلاً تا زمانی که Sales/Receivables به API وصل شوند
-          totalPurchases: 0,
-          debt: 0,
-        }));
-  
+
+        const customers = apiCustomers.map(
+          (customer) => ({
+            id: customer.id,
+            name: customer.full_name,
+            phone: customer.phone,
+            instagram: customer.instagram_handle,
+            postalCode: customer.postal_code,
+            address: customer.address,
+
+            // فعلاً تا اتصال Sales/Receivables
+            totalPurchases: 0,
+            debt: 0,
+          }),
+        );
+
         setData((prev) => ({
           ...prev,
           customers,
         }));
       } catch (error) {
-        console.error('Failed to load customers from Django API:', error);
+        console.error(
+          'Failed to load customers from Django API:',
+          error,
+        );
       }
     }
-  
+
     loadCustomers();
-  }, []);
-  const addProduct = (payload) => {
-    const normalizedSku = payload.sku.trim().toUpperCase();
-    if (!payload.name.trim()) return { ok: false, message: 'نام کالا الزامی است.' };
-    if (!normalizedSku) return { ok: false, message: 'کد SKU الزامی است.' };
-    if (data.products.some((item) => item.sku.toUpperCase() === normalizedSku)) {
-      return { ok: false, message: 'این SKU قبلاً ثبت شده است.' };
+  }, [canUseSales]);
+
+  useEffect(() => {
+    if (!canUsePurchases) {
+      setData((prev) => ({
+        ...prev,
+        suppliers: [],
+      }));
+      return;
     }
 
-    const product = {
-      id: Date.now(),
-      name: payload.name.trim(),
-      sku: normalizedSku,
-      category: payload.category.trim() || 'بدون دسته‌بندی',
-      brand: payload.brand.trim() || '—',
-      qtyW1: Number(payload.qtyW1) || 0,
-      qtyW2: Number(payload.qtyW2) || 0,
-      reserved: Number(payload.reserved) || 0,
-      minStock: Number(payload.minStock) || 0,
-      costCAD: Number(payload.costCAD) || 0,
-      priceIRR: Number(payload.priceIRR) || 0,
-    };
+    async function loadSuppliers() {
+      try {
+        const apiSuppliers =
+          await getSuppliers();
 
-    setData((prev) => ({ ...prev, products: [product, ...prev.products] }));
-    return { ok: true, message: 'کالا با موفقیت ثبت شد.' };
+        const suppliers =
+          apiSuppliers.map(
+            mapSupplierFromApi,
+          );
+
+        setData((prev) => ({
+          ...prev,
+          suppliers,
+        }));
+      } catch (error) {
+        console.error(
+          'Failed to load suppliers from Django API:',
+          error,
+        );
+      }
+    }
+
+    loadSuppliers();
+  }, [canUsePurchases]);
+
+  useEffect(() => {
+    if (!roleCode) {
+      return;
+    }
+
+    refreshInventory().catch(
+      (error) => {
+        console.error(
+          'Failed to load inventory:',
+          error,
+        );
+      },
+    );
+  }, [
+    roleCode,
+    refreshInventory,
+  ]);
+
+  const addProduct = async (payload) => {
+    if (!isStoreManager) {
+      return {
+        ok: false,
+        message:
+          'فقط مدیر فروشگاه اجازه تعریف کالا دارد.',
+      };
+    }
+
+    const normalizedSku =
+      payload.sku
+        .trim()
+        .toUpperCase();
+  
+    if (!payload.name.trim()) {
+      return {
+        ok: false,
+        message:
+          'نام کالا الزامی است.',
+      };
+    }
+  
+    if (!normalizedSku) {
+      return {
+        ok: false,
+        message:
+          'کد SKU الزامی است.',
+      };
+    }
+  
+    if (!payload.category.trim()) {
+      return {
+        ok: false,
+        message:
+          'دسته‌بندی الزامی است.',
+      };
+    }
+  
+    if (!payload.brand.trim()) {
+      return {
+        ok: false,
+        message:
+          'برند الزامی است.',
+      };
+    }
+  
+    try {
+      const openingStocks =
+        (data.warehouses || [])
+          .map((warehouse) => ({
+            warehouse:
+              warehouse.id,
+  
+            quantity:
+              Number(
+                payload.openingStocks?.[
+                  warehouse.id
+                ] ?? 0
+              ),
+          }));
+  
+      await createProduct({
+        name:
+          payload.name.trim(),
+  
+        sku:
+          normalizedSku,
+  
+        category_name:
+          payload.category.trim(),
+  
+        brand_name:
+          payload.brand.trim(),
+  
+        sales_price_irr:
+          tomanToIrr(
+            payload.priceToman
+          ),
+  
+        default_cost_cad:
+          Number(
+            payload.costCAD
+          ) || 0,
+  
+        reorder_level:
+          Number(
+            payload.minStock
+          ) || 0,
+  
+        opening_stocks:
+          openingStocks,
+      });
+  
+      await refreshInventory();
+  
+      return {
+        ok: true,
+        message:
+          'کالا و موجودی اولیه با موفقیت ثبت شد.',
+      };
+    } catch (error) {
+      console.error(
+        'Failed to create product:',
+        error,
+      );
+  
+      return {
+        ok: false,
+        message:
+          error.message ||
+          'ثبت کالا انجام نشد.',
+      };
+    }
   };
 
-  const addCustomer = (payload) => {
+  const addWarehouse = async (payload) => {
+
+    if (!payload.name.trim()) {
+      return {
+        ok: false,
+        message: 'نام انبار الزامی است.',
+      };
+    }
+  
+    try {
+  
+      await createWarehouse({
+        name: payload.name.trim(),
+        location: payload.location.trim(),
+      });
+  
+      await refreshInventory();
+  
+      return {
+        ok: true,
+        message: 'انبار با موفقیت ثبت شد.',
+      };
+  
+    } catch(error) {
+  
+      console.error(
+        'Failed to create warehouse:',
+        error,
+      );
+  
+      return {
+        ok:false,
+        message:'ثبت انبار انجام نشد.',
+      };
+    }
+  };
+  const addCustomer = async (payload) => {
     if (!payload.name.trim() || !payload.phone.trim()) {
-      return { ok: false, message: 'نام و شماره تماس مشتری الزامی است.' };
+      return {
+        ok: false,
+        message: 'نام و شماره تماس مشتری الزامی است.',
+      };
     }
-    if (data.customers.some((customer) => customer.phone === payload.phone.trim())) {
-      return { ok: false, message: 'مشتری دیگری با این شماره تماس وجود دارد.' };
+  
+    if (
+      data.customers.some(
+        (customer) => customer.phone === payload.phone.trim(),
+      )
+    ) {
+      return {
+        ok: false,
+        message: 'مشتری دیگری با این شماره تماس وجود دارد.',
+      };
     }
-
-    const customer = {
-      id: Date.now(),
-      name: payload.name.trim(),
-      phone: payload.phone.trim(),
-      instagram: payload.instagram.trim(),
-      postalCode: payload.postalCode.trim(),
-      address: payload.address.trim(),
-      totalPurchases: 0,
-      debt: 0,
-    };
-    setData((prev) => ({ ...prev, customers: [customer, ...prev.customers] }));
-    return { ok: true, message: 'مشتری جدید ثبت شد.' };
+  
+    try {
+      const apiCustomer = await createCustomer(payload);
+  
+      const customer = {
+        id: apiCustomer.id,
+        name: apiCustomer.full_name,
+        phone: apiCustomer.phone,
+        instagram: apiCustomer.instagram_handle,
+        postalCode: apiCustomer.postal_code,
+        address: apiCustomer.address,
+  
+        // فعلاً تا اتصال Sales و Receivables
+        totalPurchases: 0,
+        debt: 0,
+      };
+  
+      setData((prev) => ({
+        ...prev,
+        customers: [customer, ...prev.customers],
+      }));
+  
+      return {
+        ok: true,
+        message: 'مشتری جدید با موفقیت ثبت شد.',
+      };
+    } catch (error) {
+      console.error(
+        'Failed to create customer in Django API:',
+        error,
+      );
+  
+      return {
+        ok: false,
+        message: 'ثبت مشتری در سرور انجام نشد.',
+      };
+    }
   };
 
-  const addSupplier = (payload) => {
-    if (!payload.name.trim()) return { ok: false, message: 'نام تأمین‌کننده الزامی است.' };
-    const supplier = {
-      id: Date.now(),
-      name: payload.name.trim(),
-      country: payload.country.trim(),
-      phone: payload.phone.trim(),
-      email: payload.email.trim(),
-      purchaseCount: 0,
-      totalPurchaseCAD: 0,
-    };
-    setData((prev) => ({ ...prev, suppliers: [supplier, ...prev.suppliers] }));
-    return { ok: true, message: 'تأمین‌کننده ثبت شد.' };
+  const addSupplier = async (payload) => {
+    if (!payload.name.trim()) {
+      return {
+        ok: false,
+        message: 'نام تأمین‌کننده الزامی است.',
+      };
+    }
+  
+    try {
+      const createdSupplier = await createSupplier(payload);
+  
+      const supplier = mapSupplierFromApi(createdSupplier);
+  
+      setData((prev) => ({
+        ...prev,
+        suppliers: [supplier, ...prev.suppliers],
+      }));
+  
+      return {
+        ok: true,
+        message: 'تأمین‌کننده ثبت شد.',
+      };
+    } catch (error) {
+      console.error(
+        'Failed to create supplier in Django API:',
+        error,
+      );
+  
+      return {
+        ok: false,
+        message: 'ثبت تأمین‌کننده در سرور انجام نشد.',
+      };
+    }
   };
-
   const recordSale = ({ customerId, items, paidAmount }) => {
     const customer = data.customers.find((item) => item.id === Number(customerId));
     if (!customer) return { ok: false, message: 'مشتری معتبر انتخاب نشده است.' };
@@ -130,9 +658,30 @@ export function ERPProvider({ children }) {
       if (item.qty <= 0 || item.unitPrice < 0) {
         return { ok: false, message: 'تعداد و قیمت کالا باید معتبر باشند.' };
       }
-      const available = product.qtyW1 + product.qtyW2 - product.reserved;
-      if (item.qty > available) {
-        return { ok: false, message: `موجودی قابل فروش «${product.name}» کافی نیست.` };
+      const inventory = product.inventories?.find(
+        (inv) =>
+          inv.warehouseId === Number(item.warehouseId)
+      );
+      
+      
+      if (!inventory) {
+        return {
+          ok: false,
+          message:
+            `برای کالا «${product.name}» در این انبار موجودی ثبت نشده است.`,
+        };
+      }
+      
+      
+      if (
+        item.qty >
+        inventory.qtyAvailable
+      ) {
+        return {
+          ok: false,
+          message:
+            `موجودی «${product.name}» در انبار انتخابی کافی نیست.`,
+        };
       }
     }
 
@@ -346,38 +895,113 @@ export function ERPProvider({ children }) {
     return { ok: true, message: `خرید ${purchaseId} و بهای تمام‌شده ثبت شد.` };
   };
 
-  const transferStock = ({ productId, qty, from }) => {
-    const product = data.products.find((item) => item.id === Number(productId));
-    const amount = Number(qty);
-    if (!product) return { ok: false, message: 'کالا معتبر نیست.' };
-    if (amount <= 0) return { ok: false, message: 'تعداد انتقال باید بیشتر از صفر باشد.' };
-    const sourceQty = from === 'w1' ? product.qtyW1 : product.qtyW2;
-    if (sourceQty < amount) return { ok: false, message: 'موجودی انبار مبدأ کافی نیست.' };
-
-    const transfer = {
-      id: `TRF-${7000 + data.transfers.length + 1}`,
-      productId: product.id,
-      productName: product.name,
-      qty: amount,
-      from,
-      to: from === 'w1' ? 'w2' : 'w1',
-      date: nowISO(),
-    };
-
-    setData((prev) => ({
-      ...prev,
-      products: prev.products.map((item) =>
-        item.id !== product.id
-          ? item
-          : from === 'w1'
-            ? { ...item, qtyW1: item.qtyW1 - amount, qtyW2: item.qtyW2 + amount }
-            : { ...item, qtyW2: item.qtyW2 - amount, qtyW1: item.qtyW1 + amount },
-      ),
-      transfers: [transfer, ...prev.transfers],
-    }));
-
-    return { ok: true, message: 'انتقال موجودی ثبت شد.' };
+  const transferStock = async (
+    payload,
+  ) => {
+    if (!isStoreManager) {
+      return {
+        ok: false,
+        message:
+          'فقط مدیر فروشگاه اجازه انتقال موجودی دارد.',
+      };
+    }
+  
+    const productId =
+      Number(payload.productId);
+  
+    const sourceWarehouseId =
+      Number(
+        payload.sourceWarehouseId
+      );
+  
+    const destinationWarehouseId =
+      Number(
+        payload.destinationWarehouseId
+      );
+  
+    const quantity =
+      Number(payload.qty);
+  
+    if (!productId) {
+      return {
+        ok: false,
+        message:
+          'کالا انتخاب نشده است.',
+      };
+    }
+  
+    if (
+      !sourceWarehouseId ||
+      !destinationWarehouseId
+    ) {
+      return {
+        ok: false,
+        message:
+          'انبار مبدأ و مقصد را انتخاب کنید.',
+      };
+    }
+  
+    if (
+      sourceWarehouseId ===
+      destinationWarehouseId
+    ) {
+      return {
+        ok: false,
+        message:
+          'انبار مبدأ و مقصد نمی‌توانند یکسان باشند.',
+      };
+    }
+  
+    if (
+      !Number.isFinite(quantity) ||
+      quantity <= 0
+    ) {
+      return {
+        ok: false,
+        message:
+          'تعداد انتقال معتبر نیست.',
+      };
+    }
+  
+    try {
+      await createStockTransfer({
+        product:
+          productId,
+  
+        source_warehouse:
+          sourceWarehouseId,
+  
+        destination_warehouse:
+          destinationWarehouseId,
+  
+        quantity,
+  
+        notes:
+          payload.notes?.trim() || '',
+      });
+  
+      await refreshInventory();
+  
+      return {
+        ok: true,
+        message:
+          'انتقال موجودی با موفقیت ثبت شد.',
+      };
+    } catch (error) {
+      console.error(
+        'Failed to transfer stock:',
+        error,
+      );
+  
+      return {
+        ok: false,
+        message:
+          error.message ||
+          'انتقال موجودی انجام نشد.',
+      };
+    }
   };
+
 
   const recordExchange = ({ partner, irrPaid, cadReceived }) => {
     const paid = Number(irrPaid);
@@ -460,19 +1084,81 @@ export function ERPProvider({ children }) {
     return { ok: true, message: 'پرداخت بدهی مشتری ثبت شد.' };
   };
 
-  const resetDemo = () => setData(cloneInitialData());
+  const resetDemo = () => {
+    setData((prev) => {
+      const demo = cloneInitialData();
+
+      return {
+        ...demo,
+
+        // داده‌های متصل به API را ریست نکن
+        products: prev.products,
+        customers: prev.customers,
+        suppliers: prev.suppliers,
+        warehouses: prev.warehouses || [],
+        inventoryRecords:
+          prev.inventoryRecords || [],
+        transfers: prev.transfers || [],
+      };
+    });
+  };
 
   const metrics = useMemo(() => {
     const totalSales = data.sales.reduce((sum, item) => sum + item.total, 0);
     const collectedSales = data.sales.reduce((sum, item) => sum + item.paid, 0);
     const totalDebt = data.customers.reduce((sum, item) => sum + item.debt, 0);
     const inventoryCAD = data.products.reduce(
-      (sum, product) => sum + (product.qtyW1 + product.qtyW2) * product.costCAD,
+      (sum, product) => {
+        const totalOnHand =
+          Number(
+            product.totalOnHand ??
+              (
+                (Number(product.qtyW1) || 0) +
+                (Number(product.qtyW2) || 0)
+              ),
+          ) || 0;
+
+        return (
+          sum +
+          totalOnHand *
+            (Number(product.costCAD) || 0)
+        );
+      },
       0,
     );
-    const inventoryUnits = data.products.reduce((sum, product) => sum + product.qtyW1 + product.qtyW2, 0);
+
+    const inventoryUnits = data.products.reduce(
+      (sum, product) =>
+        sum +
+        (
+          Number(
+            product.totalOnHand ??
+              (
+                (Number(product.qtyW1) || 0) +
+                (Number(product.qtyW2) || 0)
+              ),
+          ) || 0
+        ),
+      0,
+    );
+
     const lowStockCount = data.products.filter(
-      (product) => product.qtyW1 + product.qtyW2 - product.reserved <= product.minStock,
+      (product) => {
+        const available =
+          Number(
+            product.available ??
+              (
+                (Number(product.qtyW1) || 0) +
+                (Number(product.qtyW2) || 0) -
+                (Number(product.reserved) || 0)
+              ),
+          ) || 0;
+
+        return (
+          available <=
+          (Number(product.minStock) || 0)
+        );
+      },
     ).length;
     const totalPurchasesCAD = data.purchases.reduce((sum, item) => sum + item.subtotalCAD, 0);
     const cogsIRR = data.sales.reduce((sum, sale) => {
@@ -497,15 +1183,27 @@ export function ERPProvider({ children }) {
 
   const value = {
     ...data,
+  
+    products: data.products,
+    warehouses: data.warehouses || [],
+    inventoryRecords: data.inventoryRecords || [],
+    transfers: data.transfers || [],
+  
     metrics,
+  
     addProduct,
     addCustomer,
     addSupplier,
+    addWarehouse,
     recordSale,
     recordPurchase,
+  
     transferStock,
+    refreshInventory,
+  
     recordExchange,
     settleCustomerDebt,
+  
     resetDemo,
   };
 

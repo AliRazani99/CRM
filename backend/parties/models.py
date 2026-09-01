@@ -46,8 +46,19 @@ class Supplier(models.Model):
         blank=True,
     )
 
-    contact_info = models.TextField(
+    phone = models.CharField(
+        max_length=30,
         blank=True,
+        default="",
+    )
+
+    email = models.EmailField(
+        blank=True,
+        default="",
+    )
+
+    is_active = models.BooleanField(
+        default=True,
     )
 
     created_at = models.DateTimeField(
@@ -59,7 +70,6 @@ class Supplier(models.Model):
 
     class Meta:
         db_table = "suppliers"
-
 
 class Warehouse(models.Model):
     name = models.CharField(

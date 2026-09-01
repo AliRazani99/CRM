@@ -31,16 +31,18 @@ export default function CustomersPage() {
   const selectedCustomer = customers.find((item) => item.id === selectedCustomerId) ?? filtered[0];
   const customerSales = selectedCustomer ? sales.filter((sale) => sale.customerId === selectedCustomer.id) : [];
 
-  const submitCustomer = (event) => {
+  const submitCustomer = async (event) => {
     event.preventDefault();
-    const response = addCustomer(customerForm);
+  
+    const response = await addCustomer(customerForm);
+  
     setCustomerResult(response);
+  
     if (response.ok) {
       setCustomerForm(blankCustomer);
       setTimeout(() => setCustomerModal(false), 500);
     }
   };
-
   const openSettlement = (customer) => {
     setSettleForm({ customerId: customer.id, amount: customer.debt });
     setSettleResult(null);
