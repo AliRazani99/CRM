@@ -53,45 +53,39 @@ class SaleViewSet(
         IsStoreOrSalesManager,
     ]
 
+    http_method_names = [
+        "get",
+        "post",
+        "head",
+        "options",
+    ]
+
     def get_serializer_class(self):
         if self.action == "create":
             return SaleCreateSerializer
 
         return SaleSerializer
 
-class SaleItemViewSet(viewsets.ModelViewSet):
-    queryset = SaleItem.objects.all()
+class SaleItemViewSet(
+    viewsets.ReadOnlyModelViewSet
+):
+    queryset = (
+        SaleItem.objects
+        .select_related(
+            "sale",
+            "product",
+            "warehouse",
+        )
+        .all()
+    )
+
     serializer_class = SaleItemSerializer
+
     permission_classes = [
         IsStoreOrSalesManager,
     ]
 
-    @transaction.atomic
-    def perform_create(self, serializer):
-
-        print("SALE ITEM VIEWSET CREATE CALLED")
-
-        item = serializer.save()
-
-        decrease_inventory_for_sale(
-            item,
-            self.request.user,
-        )
-
-        recalculate_sale(
-            item.sale_id
-        )
-
-    @transaction.atomic
-    def perform_update(self, serializer):
-        item = serializer.save()
-        recalculate_sale(item.sale_id)
-
-    @transaction.atomic
-    def perform_destroy(self, instance):
-        sale_id = instance.sale_id
-        instance.delete()
-        recalculate_sale(sale_id)
+    
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
@@ -101,7 +95,6 @@ class PaymentViewSet(viewsets.ModelViewSet):
         IsStoreOrSalesManager,
     ]
 
-    # پرداخت مالی بعد از ثبت نباید PATCH/DELETE شود.
     http_method_names = [
         "get",
         "post",

@@ -151,7 +151,7 @@ const [
               </div>
               {items.map((line) => {
                 const product = products.find((item) => item.id === Number(line.productId));
-                const available = product ? product.qtyW1 + product.qtyW2 - product.reserved : 0;
+                const selectedInventory = product?.inventories?.find( (inventory) => inventory.warehouseId === Number(line.warehouseId) ); const available = selectedInventory?.qtyAvailable ?? 0;
                 return (
                   <div className="line-item-row sale-grid" key={line.rowId}>
                     <div>
