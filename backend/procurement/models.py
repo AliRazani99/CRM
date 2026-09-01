@@ -33,7 +33,11 @@ class Purchase(models.Model):
         max_digits=20,
         decimal_places=8,
     )
-
+    irr_per_cad = models.DecimalField(
+    max_digits=20,
+    decimal_places=2,
+    default=1,
+    )
     shipping_cost_irr = models.DecimalField(
         max_digits=20,
         decimal_places=2,
@@ -103,7 +107,10 @@ class Purchase(models.Model):
                 check=Q(exchange_rate_to_cad__gt=0),
                 name="purchase_exchange_rate_gt_zero",
             ),
-
+            models.CheckConstraint(
+            check=Q(irr_per_cad__gt=0),
+            name="purchase_irr_per_cad_gt_zero",
+             ),
             models.CheckConstraint(
                 check=Q(shipping_cost_irr__gte=0),
                 name="purchase_shipping_cost_gte_zero",

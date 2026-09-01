@@ -2,7 +2,6 @@ from django.core.exceptions import (
     ValidationError,
 )
 from django.db import transaction
-from django.db.models import F
 
 from .models import (
     Inventory,
@@ -90,30 +89,52 @@ def transfer_stock(
             )
         )
 
-    Inventory.objects.filter(
-        pk=source_inventory.pk,
-    ).update(
-        qty_on_hand=(
-            F("qty_on_hand")
-            - quantity
-        ),
-        qty_available=(
-            F("qty_available")
-            - quantity
-        ),
+    destination_qty_before = (
+        destination_inventory.qty_on_hand
+    )
+    destination_cost_before = (
+        destination_inventory.avg_cost_cad
+    )
+    source_cost = (
+        source_inventory.avg_cost_cad
     )
 
-    Inventory.objects.filter(
-        pk=destination_inventory.pk,
-    ).update(
-        qty_on_hand=(
-            F("qty_on_hand")
-            + quantity
-        ),
-        qty_available=(
-            F("qty_available")
-            + quantity
-        ),
+    destination_qty_after = (
+        destination_qty_before
+        + quantity
+    )
+
+    destination_cost_after = (
+        (
+            destination_qty_before
+            * destination_cost_before
+        )
+        + (
+            quantity
+            * source_cost
+        )
+    ) / destination_qty_after
+
+    source_inventory.qty_on_hand -= (
+        quantity
+    )
+    source_inventory.save(
+        update_fields=[
+            "qty_on_hand",
+        ]
+    )
+
+    destination_inventory.qty_on_hand = (
+        destination_qty_after
+    )
+    destination_inventory.avg_cost_cad = (
+        destination_cost_after
+    )
+    destination_inventory.save(
+        update_fields=[
+            "qty_on_hand",
+            "avg_cost_cad",
+        ]
     )
 
     stock_transfer = (

@@ -68,6 +68,9 @@ export default function InventoryPage() {
     products,
     warehouses,
     transfers,
+  
+    stockMovements = [],
+  
     addProduct,
     transferStock,
     addWarehouse,
@@ -348,7 +351,28 @@ export default function InventoryPage() {
       ) || null
     );
   };
+  const warehouseSummaries = useMemo(() => { return warehouses.map( (warehouse) => { const rows = products.flatMap( (product) => ( product.inventories || [] ).filter( (inventory) => Number( inventory.warehouseId ) === Number( warehouse.id ), ), ); return { ...warehouse, productCount: rows.filter( (row) => row.qtyOnHand > 0 || row.qtyReserved > 0 ).length, totalOnHand: rows.reduce( (sum, row) => sum + Number( row.qtyOnHand ), 0, ), totalReserved: rows.reduce( (sum, row) => sum + Number( row.qtyReserved ), 0, ), totalAvailable: rows.reduce( (sum, row) => sum + Number( row.qtyAvailable ), 0, ), }; }, ); }, [ warehouses, products, ]);
+  const selectedTransferProduct =
+  products.find(
+    (product) =>
+      Number(product.id) ===
+      Number(
+        transferForm.productId
+      ),
+  );
 
+const selectedSourceInventory =
+  selectedTransferProduct
+    ? getInventoryForWarehouse(
+        selectedTransferProduct,
+        transferForm
+          .sourceWarehouseId,
+      )
+    : null;
+
+const sourceAvailable =
+  selectedSourceInventory
+    ?.qtyAvailable ?? 0;
 
   return (
     <div className="page-stack">
@@ -435,6 +459,84 @@ export default function InventoryPage() {
           </div>
         </Panel>
       )}
+      <Panel
+        title="فهرست انبارها"
+        subtitle="نمای کلی موجودی هر انبار"
+      >
+        <div className="table-wrap">
+
+          <table className="data-table">
+
+            <thead>
+              <tr>
+                <th>انبار</th>
+                <th>موقعیت</th>
+                <th>
+                  کالاهای دارای موجودی
+                </th>
+                <th>موجودی کل</th>
+                <th>رزرو</th>
+                <th>قابل فروش</th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              {warehouseSummaries.map(
+                (warehouse) => (
+
+                  <tr
+                    key={warehouse.id}
+                  >
+
+                    <td>
+                      <strong>
+                        {warehouse.name}
+                      </strong>
+                    </td>
+
+                    <td>
+                      {
+                        warehouse.location ||
+                        '—'
+                      }
+                    </td>
+
+                    <td>
+                      {
+                        warehouse.productCount
+                      }
+                    </td>
+
+                    <td>
+                      {
+                        warehouse.totalOnHand
+                      }
+                    </td>
+
+                    <td>
+                      {
+                        warehouse.totalReserved
+                      }
+                    </td>
+
+                    <td>
+                      {
+                        warehouse.totalAvailable
+                      }
+                    </td>
+
+                  </tr>
+
+                )
+              )}
+
+            </tbody>
+
+          </table>
+
+        </div>
+      </Panel>
 
       <Panel>
         <div className="toolbar-row">
@@ -741,7 +843,113 @@ export default function InventoryPage() {
             </table>
           </div>
         </Panel>
+        
       )}
+      <Panel
+  title="گردش موجودی"
+  subtitle="موجودی اولیه، فروش و انتقال‌های ثبت‌شده"
+>
+  <div className="table-wrap">
+
+    <table className="data-table">
+
+      <thead>
+        <tr>
+          <th>تاریخ</th>
+          <th>کالا</th>
+          <th>انبار</th>
+          <th>نوع</th>
+          <th>تعداد</th>
+          <th>مرجع</th>
+        </tr>
+      </thead>
+
+      <tbody>
+
+        {stockMovements.length === 0 ? (
+
+          <tr>
+            <td
+              colSpan="6"
+              className="muted-text"
+            >
+              هنوز گردش موجودی
+              ثبت نشده است.
+            </td>
+          </tr>
+
+        ) : (
+
+          stockMovements
+            .slice(0, 100)
+            .map(
+              (movement) => (
+
+                <tr
+                  key={movement.id}
+                >
+
+                  <td>
+                    {formatDate(
+                      movement.date
+                    )}
+                  </td>
+
+                  <td>
+                    {
+                      movement
+                        .productName
+                    }
+                  </td>
+
+                  <td>
+                    {
+                      movement
+                        .warehouseName
+                    }
+                  </td>
+
+                  <td>
+                    {movement.type}
+                  </td>
+
+                  <td
+                    className={
+                      movement.quantity < 0
+                        ? 'danger-text'
+                        : 'positive-text'
+                    }
+                  >
+                    {movement.quantity}
+                  </td>
+
+                  <td>
+                    {
+                      movement
+                        .referenceType ||
+                      '—'
+                    }
+
+                    {
+                      movement.referenceId
+                        ? ` #${movement.referenceId}`
+                        : ''
+                    }
+                  </td>
+
+                </tr>
+
+              )
+            )
+
+        )}
+
+      </tbody>
+
+    </table>
+
+  </div>
+</Panel>
       <Modal
         open={warehouseModal}
         onClose={()=>setWarehouseModal(false)}
@@ -801,6 +1009,9 @@ export default function InventoryPage() {
         />
         </Field>
 
+        <FormMessage
+        result={warehouseResult}
+      />
 
         <button
         className="button primary"
@@ -1128,36 +1339,59 @@ export default function InventoryPage() {
                 value={
                   transferForm.sourceWarehouseId
                 }
-                onChange={(
-                  event
-                ) =>
+                onChange={(event) => {
+                  const sourceWarehouseId =
+                    event.target.value;
+                
                   setTransferForm({
                     ...transferForm,
-                    sourceWarehouseId:
-                      event.target
-                        .value,
-                  })
-                }
+                
+                    sourceWarehouseId,
+                
+                    destinationWarehouseId:
+                      Number(
+                        transferForm
+                          .destinationWarehouseId
+                      ) ===
+                      Number(
+                        sourceWarehouseId
+                      )
+                        ? ''
+                        : transferForm
+                            .destinationWarehouseId,
+                  });
+                }}
               >
                 <option value="">
                   انتخاب مبدأ
                 </option>
 
                 {warehouses.map(
-                  (warehouse) => (
-                    <option
-                      key={
-                        warehouse.id
-                      }
-                      value={
-                        warehouse.id
-                      }
-                    >
-                      {
-                        warehouse.name
-                      }
-                    </option>
-                  ),
+                  (warehouse) => {
+
+                    const inventory =
+                      selectedTransferProduct
+                        ? getInventoryForWarehouse(
+                            selectedTransferProduct,
+                            warehouse.id,
+                          )
+                        : null;
+
+                    return (
+                      <option
+                        key={warehouse.id}
+                        value={warehouse.id}
+                      >
+                        {warehouse.name}
+                        {' — '}
+                        {
+                          inventory
+                            ?.qtyAvailable ?? 0
+                        }
+                        {' قابل فروش'}
+                      </option>
+                    );
+                  },
                 )}
               </select>
             </Field>
@@ -1186,48 +1420,62 @@ export default function InventoryPage() {
                   انتخاب مقصد
                 </option>
 
-                {warehouses.map(
-                  (warehouse) => (
-                    <option
-                      key={
+                {warehouses
+                  .filter(
+                    (warehouse) =>
+                      Number(
                         warehouse.id
-                      }
-                      value={
-                        warehouse.id
-                      }
-                    >
-                      {
-                        warehouse.name
-                      }
-                    </option>
-                  ),
-                )}
+                      ) !==
+                      Number(
+                        transferForm
+                          .sourceWarehouseId
+                      ),
+                  )
+                  .map(
+                    (warehouse) => (
+                      <option
+                        key={warehouse.id}
+                        value={warehouse.id}
+                      >
+                        {warehouse.name}
+                      </option>
+                    ),
+                  )}
               </select>
             </Field>
           </div>
 
           <Field
-            label="تعداد"
+          label={
+            `تعداد — حداکثر قابل انتقال: ${sourceAvailable}`
+          }
+          required
+        >
+          <input
             required
-          >
-            <input
-              required
-              type="number"
-              min="1"
-              value={
-                transferForm.qty
-              }
-              onChange={(event) =>
-                setTransferForm({
-                  ...transferForm,
-                  qty:
-                    event.target
-                      .value,
-                })
-              }
-            />
-          </Field>
+            type="number"
+            min="1"
 
+            max={
+              sourceAvailable > 0
+                ? sourceAvailable
+                : undefined
+            }
+
+            value={
+              transferForm.qty
+            }
+
+            onChange={(event) =>
+              setTransferForm({
+                ...transferForm,
+
+                qty:
+                  event.target.value,
+              })
+            }
+          />
+        </Field>
           <Field label="توضیحات">
             <textarea
               value={
@@ -1265,7 +1513,8 @@ export default function InventoryPage() {
               className="button primary"
               type="submit"
               disabled={
-                transferSubmitting
+                transferSubmitting ||
+                sourceAvailable <= 0
               }
             >
               <ArrowRightLeft

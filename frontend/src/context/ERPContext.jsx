@@ -23,6 +23,7 @@ import {
 import {
   createStockTransfer,
   getInventory,
+  getStockMovements,
   getStockTransfers,
   getWarehouses,
   createWarehouse,
@@ -125,6 +126,46 @@ const mapCustomerFromApi = (customer) => ({
   debt: 0,
 });
 
+const mapMovementFromApi = (
+  movement,
+) => ({
+  id:
+    Number(movement.id),
+
+  productId:
+    Number(movement.product),
+
+  productName:
+    movement.product_name,
+
+  warehouseId:
+    Number(movement.warehouse),
+
+  warehouseName:
+    movement.warehouse_name,
+
+  type:
+    movement.movement_type,
+
+  quantity:
+    Number(movement.quantity),
+
+  referenceType:
+    movement.reference_type || '',
+
+  referenceId:
+    movement.reference_id == null
+      ? null
+      : Number(
+          movement.reference_id
+        ),
+
+  date:
+    movement.movement_date,
+
+  notes:
+    movement.notes || '',
+});
 
 const mapSaleFromApi = (
   sale,
@@ -389,13 +430,19 @@ export function ERPProvider({ children }) {
       apiInventory,
       apiWarehouses,
       apiTransfers,
+      apiMovements,
     ] = await Promise.all([
       getProducts(),
+
       getInventory(),
+
       getWarehouses(),
+
       isStoreManager
         ? getStockTransfers()
         : Promise.resolve([]),
+
+      getStockMovements(),
     ]);
 
     const products = buildProductsFromApi(
@@ -407,15 +454,33 @@ export function ERPProvider({ children }) {
     const transfers = apiTransfers.map(
       mapTransferFromApi,
     );
+    const stockMovements =
+  apiMovements.map(
+    mapMovementFromApi,
+  );
 
-    setData((prev) => ({
-      ...prev,
-      products,
-      warehouses: apiWarehouses,
-      inventoryRecords: apiInventory,
-      transfers,
-    }));
-  }, [isStoreManager, roleCode]);
+  setData((prev) => ({
+    ...prev,
+  
+    products,
+  
+    warehouses:
+      apiWarehouses,
+  
+    inventoryRecords:
+      apiInventory,
+  
+    transfers,
+  
+    stockMovements,
+  }));
+  
+  }, [
+    isStoreManager,
+    roleCode,
+  ]);
+  
+  
 
   useEffect(() => {
     localStorage.setItem(
@@ -1231,8 +1296,14 @@ export function ERPProvider({ children }) {
       };
     }
   
+    // -----------------------------
+    // Normalize IDs / quantity
+    // -----------------------------
+  
     const productId =
-      Number(payload.productId);
+      Number(
+        payload.productId
+      );
   
     const sourceWarehouseId =
       Number(
@@ -1245,7 +1316,13 @@ export function ERPProvider({ children }) {
       );
   
     const quantity =
-      Number(payload.qty);
+      Number(
+        payload.qty
+      );
+  
+    // -----------------------------
+    // Basic validations
+    // -----------------------------
   
     if (!productId) {
       return {
@@ -1288,6 +1365,59 @@ export function ERPProvider({ children }) {
       };
     }
   
+    // -----------------------------
+    // Check source inventory in UI
+    // -----------------------------
+  
+    const product =
+      data.products.find(
+        (item) =>
+          Number(item.id) ===
+          productId,
+      );
+  
+    if (!product) {
+      return {
+        ok: false,
+        message:
+          'کالای انتخاب‌شده معتبر نیست.',
+      };
+    }
+  
+    const sourceInventory =
+      product.inventories?.find(
+        (inventory) =>
+          Number(
+            inventory.warehouseId
+          ) ===
+          sourceWarehouseId,
+      );
+  
+    if (!sourceInventory) {
+      return {
+        ok: false,
+        message:
+          'برای این کالا در انبار مبدأ موجودی تعریف نشده است.',
+      };
+    }
+  
+    if (
+      quantity >
+      Number(
+        sourceInventory.qtyAvailable
+      )
+    ) {
+      return {
+        ok: false,
+        message:
+          'موجودی قابل فروش انبار مبدأ برای این انتقال کافی نیست.',
+      };
+    }
+  
+    // -----------------------------
+    // Backend transfer
+    // -----------------------------
+  
     try {
       await createStockTransfer({
         product:
@@ -1305,6 +1435,7 @@ export function ERPProvider({ children }) {
           payload.notes?.trim() || '',
       });
   
+      // دوباره از Backend بخوان
       await refreshInventory();
   
       return {
@@ -1312,6 +1443,7 @@ export function ERPProvider({ children }) {
         message:
           'انتقال موجودی با موفقیت ثبت شد.',
       };
+  
     } catch (error) {
       console.error(
         'Failed to transfer stock:',
@@ -1326,7 +1458,6 @@ export function ERPProvider({ children }) {
       };
     }
   };
-
 
   const recordExchange = ({ partner, irrPaid, cadReceived }) => {
     const paid = Number(irrPaid);
@@ -1553,7 +1684,7 @@ export function ERPProvider({ children }) {
       };
     }
   };
-  
+
   const resetDemo = () => {
     setData((prev) => {
       const demo = cloneInitialData();
@@ -1561,11 +1692,12 @@ export function ERPProvider({ children }) {
       return {
         ...demo,
 
-        // داده‌های متصل به API را ریست نکن
         products: prev.products,
         customers: prev.customers,
         suppliers: prev.suppliers,
         warehouses: prev.warehouses || [],
+        stockMovements:
+          prev.stockMovements || [],
         inventoryRecords:
           prev.inventoryRecords || [],
         transfers: prev.transfers || [],
@@ -1658,7 +1790,8 @@ export function ERPProvider({ children }) {
     warehouses: data.warehouses || [],
     inventoryRecords: data.inventoryRecords || [],
     transfers: data.transfers || [],
-  
+    stockMovements:
+     data.stockMovements || [],
     metrics,
   
     addProduct,

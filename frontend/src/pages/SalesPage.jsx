@@ -150,53 +150,202 @@ const [
               <span>کالا</span> <span>انبار</span> <span>تعداد</span> <span>قیمت واحد</span>
               </div>
               {items.map((line) => {
-                const product = products.find((item) => item.id === Number(line.productId));
-                const selectedInventory = product?.inventories?.find( (inventory) => inventory.warehouseId === Number(line.warehouseId) ); const available = selectedInventory?.qtyAvailable ?? 0;
-                return (
-                  <div className="line-item-row sale-grid" key={line.rowId}>
-                    <div>
-                      <select value={line.productId} onChange={(event) => updateLine(line.rowId, { productId: event.target.value })}>
-                        <option value="">انتخاب کالا</option>
-                        {products.map((item) => (
-                          <option key={item.id} value={item.id}>{item.name} — {item.sku}</option>
-                        ))}
-                      </select>
-                      <small className={Number(line.qty) > available ? 'danger-text' : ''}>قابل فروش: {available} واحد</small>
-                    </div>
+
+              const product =
+                products.find(
+                  (item) =>
+                    item.id ===
+                    Number(line.productId)
+                );
+
+              const selectedInventory =
+                product?.inventories?.find(
+                  (inventory) =>
+                    Number(
+                      inventory.warehouseId
+                    ) ===
+                    Number(
+                      line.warehouseId
+                    )
+                );
+
+              const available =
+                selectedInventory
+                  ?.qtyAvailable ?? 0;
+
+              return (
+                <div
+                  className="line-item-row sale-grid"
+                  key={line.rowId}
+                >
+
+                  <div>
                     <select
-                      value={line.warehouseId}
-                      onChange={(event)=>
+                      value={line.productId}
+                      onChange={(event) =>
                         updateLine(
                           line.rowId,
                           {
-                            warehouseId:event.target.value
+                            productId:
+                              event.target.value,
                           }
                         )
                       }
                     >
                       <option value="">
-                        انتخاب انبار
+                        انتخاب کالا
                       </option>
 
-                      {warehouses.map((warehouse)=>(
-                        <option
-                          key={warehouse.id}
-                          value={warehouse.id}
-                        >
-                          {warehouse.name}
-                        </option>
-                      ))}
+                      {products.map(
+                        (item) => (
+                          <option
+                            key={item.id}
+                            value={item.id}
+                          >
+                            {item.name}
+                            {' — '}
+                            {item.sku}
+                          </option>
+                        )
+                      )}
+                    </select>
 
-                    </select> 
-                    <input type="number" min="1" value={line.qty} onChange={(event) => updateLine(line.rowId, { qty: event.target.value })} />
-                    <input type="number" min="0" value={line.unitPrice} onChange={(event) => updateLine(line.rowId, { unitPrice: event.target.value })} />
-                    <strong className="line-total">{formatToman(Number(line.qty || 0) * Number(line.unitPrice || 0))}</strong>
-                    <button className="icon-button danger" type="button" onClick={() => removeLine(line.rowId)} title="حذف ردیف">
-                      <Trash2 size={16} />
-                    </button>
+                    <small
+                      className={
+                        Number(line.qty) >
+                        available
+                          ? 'danger-text'
+                          : ''
+                      }
+                    >
+                      قابل فروش:
+                      {' '}
+                      {available}
+                      {' '}
+                      واحد
+                    </small>
                   </div>
-                );
-              })}
+
+                  <select
+                    value={
+                      line.warehouseId
+                    }
+                    onChange={(event) =>
+                      updateLine(
+                        line.rowId,
+                        {
+                          warehouseId:
+                            event.target.value,
+                        }
+                      )
+                    }
+                  >
+                    <option value="">
+                      انتخاب انبار
+                    </option>
+
+                    {warehouses.map(
+                      (warehouse) => {
+
+                        const warehouseInventory =
+                          product
+                            ?.inventories
+                            ?.find(
+                              (inventory) =>
+                                Number(
+                                  inventory
+                                    .warehouseId
+                                ) ===
+                                Number(
+                                  warehouse.id
+                                )
+                            );
+
+                        const warehouseAvailable =
+                          warehouseInventory
+                            ?.qtyAvailable ?? 0;
+
+                        return (
+                          <option
+                            key={
+                              warehouse.id
+                            }
+                            value={
+                              warehouse.id
+                            }
+                          >
+                            {warehouse.name}
+                            {' — '}
+                            {warehouseAvailable}
+                            {' قابل فروش'}
+                          </option>
+                        );
+                      }
+                    )}
+
+                  </select>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={line.qty}
+                    onChange={(event) =>
+                      updateLine(
+                        line.rowId,
+                        {
+                          qty:
+                            event.target.value,
+                        }
+                      )
+                    }
+                  />
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={
+                      line.unitPrice
+                    }
+                    onChange={(event) =>
+                      updateLine(
+                        line.rowId,
+                        {
+                          unitPrice:
+                            event.target.value,
+                        }
+                      )
+                    }
+                  />
+
+                  <strong
+                    className="line-total"
+                  >
+                    {formatToman(
+                      Number(
+                        line.qty || 0
+                      ) *
+                      Number(
+                        line.unitPrice || 0
+                      )
+                    )}
+                  </strong>
+
+                  <button
+                    className="icon-button danger"
+                    type="button"
+                    onClick={() =>
+                      removeLine(
+                        line.rowId
+                      )
+                    }
+                    title="حذف ردیف"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+
+                </div>
+              );
+            })}
             </div>
 
             <div className="invoice-summary">

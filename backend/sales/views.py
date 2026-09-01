@@ -79,7 +79,9 @@ class SaleItemViewSet(
         .all()
     )
 
-    serializer_class = SaleItemSerializer
+    serializer_class = (
+        SaleItemSerializer
+    )
 
     permission_classes = [
         IsStoreOrSalesManager,

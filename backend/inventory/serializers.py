@@ -5,7 +5,9 @@ from .models import (
     StockMovement,
     StockTransfer,
 )
-
+from django.core.exceptions import (
+ValidationError as DjangoValidationError,
+)
 
 class InventorySerializer(
     serializers.ModelSerializer
@@ -106,7 +108,12 @@ class StockTransferSerializer(
     def create(self, validated_data):
         request = self.context["request"]
 
-        return transfer_stock(
-            created_by=request.user,
-            **validated_data,
-        )
+        try:
+            return transfer_stock(
+                created_by=request.user,
+                **validated_data,
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                exc.messages
+            )
