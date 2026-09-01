@@ -6,12 +6,15 @@ import {
   nowISO,
   tomanToIrr,
 } from '../utils/formatters';
+
 import {
   createCustomer,
   createSupplier,
   getCustomers,
   getSuppliers,
+  getFinancialAccounts,
 } from '../api/parties';
+
 import {
   createProduct,
   getProducts,
@@ -24,6 +27,12 @@ import {
   getWarehouses,
   createWarehouse,
 } from '../api/inventory';
+
+import {
+  createSale,
+  getSales,
+  settleCustomerDebtApi,
+} from '../api/sales';
 
 import {
   useAuth,
@@ -48,6 +57,28 @@ const mapSupplierFromApi = (supplier) => ({
 
   purchaseCount: 0,
   totalPurchaseCAD: 0,
+});
+
+const mapFinancialAccountFromApi = (
+  account,
+) => ({
+  id: Number(account.id),
+
+  name: account.name,
+
+  accountType:
+    account.account_type,
+
+  currencyCode:
+    account.currency_code,
+
+  currentBalance:
+    irrToToman(
+      account.current_balance
+    ),
+
+  isActive:
+    account.is_active,
 });
 
 const mapTransferFromApi = (transfer) => ({
@@ -80,7 +111,96 @@ const mapTransferFromApi = (transfer) => ({
   notes:
     transfer.notes || '',
 });
+const mapCustomerFromApi = (customer) => ({
+  id: Number(customer.id),
 
+  name: customer.full_name,
+  phone: customer.phone,
+  instagram: customer.instagram_handle,
+  postalCode: customer.postal_code,
+  address: customer.address,
+
+  totalPurchases: 0,
+  totalPaid: 0,
+  debt: 0,
+});
+
+
+const mapSaleFromApi = (
+  sale,
+  customersById,
+) => {
+  const customerId =
+    Number(sale.customer);
+
+  const customer =
+    customersById.get(customerId);
+
+  return {
+    /*
+     * در UI شماره فاکتور را نشان می‌دهیم،
+     * ولی ID واقعی دیتابیس را هم نگه می‌داریم.
+     */
+    id: sale.invoice_number,
+    backendId: Number(sale.id),
+
+    customerId,
+
+    customerName:
+      customer?.name ??
+      `مشتری #${customerId}`,
+
+    date: sale.sale_date,
+
+    /*
+     * Backend = IRR
+     * Frontend = Toman
+     */
+    total: irrToToman(
+      sale.total_amount
+    ),
+
+    paid: irrToToman(
+      sale.total_paid
+    ),
+
+    debt: irrToToman(
+      sale.total_debt
+    ),
+
+    status:
+      sale.settlement_status === 'PAID'
+        ? 'paid'
+        : sale.settlement_status === 'PARTIAL'
+          ? 'partial'
+          : 'unpaid',
+
+    items: (sale.items || []).map(
+      (item) => ({
+        id: Number(item.id),
+
+        productId:
+          Number(item.product),
+
+        warehouseId:
+          Number(item.warehouse),
+
+        qty:
+          Number(item.quantity),
+
+        unitPrice:
+          irrToToman(
+            item.unit_price_irr
+          ),
+
+        lineTotal:
+          irrToToman(
+            item.line_total_irr
+          ),
+      }),
+    ),
+  };
+};
 
 const buildProductsFromApi = (
   apiProducts,
@@ -309,42 +429,120 @@ export function ERPProvider({ children }) {
       setData((prev) => ({
         ...prev,
         customers: [],
+        sales: [],
       }));
+  
       return;
     }
-
-    async function loadCustomers() {
+  
+    async function loadCustomersAndSales() {
       try {
-        const apiCustomers = await getCustomers();
-
-        const customers = apiCustomers.map(
-          (customer) => ({
-            id: customer.id,
-            name: customer.full_name,
-            phone: customer.phone,
-            instagram: customer.instagram_handle,
-            postalCode: customer.postal_code,
-            address: customer.address,
-
-            // فعلاً تا اتصال Sales/Receivables
-            totalPurchases: 0,
-            debt: 0,
-          }),
-        );
+        const [
+          apiCustomers,
+          apiSales,
+          apiAccounts,
+        ] = await Promise.all([
+          getCustomers(),
+          getSales(),
+          getFinancialAccounts(),
+        ]);
+  
+        
+        const baseCustomers =
+          apiCustomers.map(
+            mapCustomerFromApi,
+          );
+  
+        
+        const customersById =
+          new Map(
+            baseCustomers.map(
+              (customer) => [
+                customer.id,
+                customer,
+              ],
+            ),
+          );
+  
+        
+        const sales =
+          apiSales
+            .map(
+              (sale) =>
+                mapSaleFromApi(
+                  sale,
+                  customersById,
+                ),
+            )
+            .sort(
+              (a, b) =>
+                b.backendId -
+                a.backendId,
+            );
+  
+        
+        const customers =
+          baseCustomers.map(
+            (customer) => {
+              const customerSales =
+                sales.filter(
+                  (sale) =>
+                    sale.customerId ===
+                    customer.id,
+                );
+  
+              const totalPurchases =
+                customerSales.reduce(
+                  (sum, sale) =>
+                    sum + sale.total,
+                  0,
+                );
+  
+              const totalPaid =
+                customerSales.reduce(
+                  (sum, sale) =>
+                    sum + sale.paid,
+                  0,
+                );
+  
+              const debt =
+                customerSales.reduce(
+                  (sum, sale) =>
+                    sum + sale.debt,
+                  0,
+                );
+  
+              return {
+                ...customer,
+                totalPurchases,
+                totalPaid,
+                debt,
+              };
+            },
+          );
+  
+          const financialAccounts =
+          apiAccounts.map(
+            mapFinancialAccountFromApi,
+          );
 
         setData((prev) => ({
           ...prev,
           customers,
+          sales,
+          financialAccounts,
         }));
+  
       } catch (error) {
         console.error(
-          'Failed to load customers from Django API:',
+          'Failed to load customers and sales from Django API:',
           error,
         );
       }
     }
-
-    loadCustomers();
+  
+    loadCustomersAndSales();
+  
   }, [canUseSales]);
 
   useEffect(() => {
@@ -573,15 +771,16 @@ export function ERPProvider({ children }) {
       const apiCustomer = await createCustomer(payload);
   
       const customer = {
-        id: apiCustomer.id,
+        id: Number(apiCustomer.id),
+      
         name: apiCustomer.full_name,
         phone: apiCustomer.phone,
         instagram: apiCustomer.instagram_handle,
         postalCode: apiCustomer.postal_code,
         address: apiCustomer.address,
-  
-        // فعلاً تا اتصال Sales و Receivables
+      
         totalPurchases: 0,
+        totalPaid: 0,
         debt: 0,
       };
   
@@ -641,124 +840,250 @@ export function ERPProvider({ children }) {
       };
     }
   };
-  const recordSale = ({ customerId, items, paidAmount }) => {
-    const customer = data.customers.find((item) => item.id === Number(customerId));
-    if (!customer) return { ok: false, message: 'مشتری معتبر انتخاب نشده است.' };
-    if (!items.length) return { ok: false, message: 'حداقل یک کالا به فاکتور اضافه کنید.' };
-
-    const normalizedItems = items.map((item) => ({
-      productId: Number(item.productId),
-      qty: Number(item.qty),
-      unitPrice: Number(item.unitPrice),
-    }));
-
-    for (const item of normalizedItems) {
-      const product = data.products.find((p) => p.id === item.productId);
-      if (!product) return { ok: false, message: 'یکی از کالاهای انتخاب‌شده معتبر نیست.' };
-      if (item.qty <= 0 || item.unitPrice < 0) {
-        return { ok: false, message: 'تعداد و قیمت کالا باید معتبر باشند.' };
-      }
-      const inventory = product.inventories?.find(
-        (inv) =>
-          inv.warehouseId === Number(item.warehouseId)
+  
+  const recordSale = async ({
+    customerId,
+    items,
+    paidAmount,
+    paymentAccountId,
+  }) => {
+    const customer =
+      data.customers.find(
+        (item) =>
+          item.id ===
+          Number(customerId),
       );
-      
-      
-      if (!inventory) {
-        return {
-          ok: false,
-          message:
-            `برای کالا «${product.name}» در این انبار موجودی ثبت نشده است.`,
-        };
-      }
-      
-      
+  
+    if (!customer) {
+      return {
+        ok: false,
+        message:
+          'مشتری معتبر انتخاب نشده است.',
+      };
+    }
+  
+    if (!items.length) {
+      return {
+        ok: false,
+        message:
+          'حداقل یک کالا به فاکتور اضافه کنید.',
+      };
+    }
+  
+    const normalizedItems =
+      items.map((item) => ({
+        product:
+          Number(item.productId),
+  
+        warehouse:
+          Number(item.warehouseId),
+  
+        quantity:
+          Number(item.qty),
+  
+        unit_price_irr:
+          tomanToIrr(
+            item.unitPrice
+          ),
+      }));
+  
+    for (
+      const item of normalizedItems
+    ) {
       if (
-        item.qty >
-        inventory.qtyAvailable
+        !item.product ||
+        !item.warehouse
       ) {
         return {
           ok: false,
           message:
-            `موجودی «${product.name}» در انبار انتخابی کافی نیست.`,
+            'کالا و انبار همه ردیف‌ها الزامی است.',
+        };
+      }
+  
+      if (
+        item.quantity <= 0 ||
+        item.unit_price_irr < 0
+      ) {
+        return {
+          ok: false,
+          message:
+            'تعداد یا قیمت یکی از ردیف‌ها معتبر نیست.',
         };
       }
     }
-
-    const total = normalizedItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
-    const paid = Number(paidAmount) || 0;
-    if (paid < 0 || paid > total) return { ok: false, message: 'مبلغ پرداختی باید بین صفر و مبلغ کل باشد.' };
-    const debt = total - paid;
-    const saleId = `INV-${1000 + data.sales.length + 1}`;
-    const date = nowISO();
-
-    setData((prev) => {
-      const updatedProducts = prev.products.map((product) => {
-        const line = normalizedItems.find((item) => item.productId === product.id);
-        if (!line) return product;
-
-        let remaining = line.qty;
-        let qtyW1 = product.qtyW1;
-        let qtyW2 = product.qtyW2;
-        if (qtyW1 >= remaining) {
-          qtyW1 -= remaining;
-        } else {
-          remaining -= qtyW1;
-          qtyW1 = 0;
-          qtyW2 -= remaining;
-        }
-        return { ...product, qtyW1, qtyW2 };
-      });
-
-      const saleItems = normalizedItems.map((line) => {
-        const product = prev.products.find((item) => item.id === line.productId);
-        return {
-          ...line,
-          productName: product?.name ?? 'کالای حذف‌شده',
-          lineTotal: line.qty * line.unitPrice,
-        };
-      });
-
-      const sale = {
-        id: saleId,
-        customerId: customer.id,
-        customerName: customer.name,
-        date,
-        total,
-        paid,
-        debt,
-        status: debt === 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
-        items: saleItems,
-      };
-
-      const updatedCustomers = prev.customers.map((item) =>
-        item.id === customer.id
-          ? { ...item, totalPurchases: item.totalPurchases + total, debt: item.debt + debt }
-          : item,
+  
+    const totalToman =
+      items.reduce(
+        (sum, item) =>
+          sum +
+          Number(item.qty) *
+          Number(item.unitPrice),
+        0,
       );
-
-      const transaction = paid > 0
-        ? {
-            id: makeId('TX'),
-            date,
-            type: 'sale',
-            title: `دریافت فروش ${saleId}`,
-            account: 'IRR',
-            amount: paid,
-          }
-        : null;
-
+  
+    const paidToman =
+      Number(paidAmount) || 0;
+  
+    if (
+      paidToman < 0 ||
+      paidToman > totalToman
+    ) {
       return {
-        ...prev,
-        products: updatedProducts,
-        customers: updatedCustomers,
-        sales: [sale, ...prev.sales],
-        accounts: { ...prev.accounts, irrBalance: prev.accounts.irrBalance + paid },
-        transactions: transaction ? [transaction, ...prev.transactions] : prev.transactions,
+        ok: false,
+        message:
+          'مبلغ پرداختی معتبر نیست.',
       };
-    });
-
-    return { ok: true, message: `فاکتور ${saleId} ثبت شد.` };
+    }
+  
+    if (
+      paidToman > 0 &&
+      !paymentAccountId
+    ) {
+      return {
+        ok: false,
+        message:
+          'حساب دریافت وجه را انتخاب کنید.',
+      };
+    }
+  
+    try {
+      const createdSale =
+        await createSale({
+          customer:
+            Number(customerId),
+  
+          sale_date:
+            new Date()
+              .toISOString()
+              .slice(0, 10),
+  
+          items:
+            normalizedItems,
+  
+          paid_amount:
+            tomanToIrr(
+              paidToman
+            ),
+  
+          payment_account:
+            paidToman > 0
+              ? Number(
+                  paymentAccountId
+                )
+              : null,
+  
+          payment_method:
+            'CASH',
+  
+          notes:
+            '',
+        });
+  
+      const [
+        apiCustomers,
+        apiSales,
+        apiAccounts,
+      ] = await Promise.all([
+        getCustomers(),
+        getSales(),
+        getFinancialAccounts(),
+      ]);
+  
+      const baseCustomers =
+        apiCustomers.map(
+          mapCustomerFromApi,
+        );
+  
+      const customersById =
+        new Map(
+          baseCustomers.map(
+            (customer) => [
+              customer.id,
+              customer,
+            ],
+          ),
+        );
+  
+      const sales =
+        apiSales.map(
+          (sale) =>
+            mapSaleFromApi(
+              sale,
+              customersById,
+            ),
+        );
+  
+      const customers =
+        baseCustomers.map(
+          (customer) => {
+            const customerSales =
+              sales.filter(
+                (sale) =>
+                  sale.customerId ===
+                  customer.id,
+              );
+  
+            return {
+              ...customer,
+  
+              totalPurchases:
+                customerSales.reduce(
+                  (sum, sale) =>
+                    sum + sale.total,
+                  0,
+                ),
+  
+              totalPaid:
+                customerSales.reduce(
+                  (sum, sale) =>
+                    sum + sale.paid,
+                  0,
+                ),
+  
+              debt:
+                customerSales.reduce(
+                  (sum, sale) =>
+                    sum + sale.debt,
+                  0,
+                ),
+            };
+          },
+        );
+  
+      setData((prev) => ({
+        ...prev,
+  
+        customers,
+        sales,
+  
+        financialAccounts:
+          apiAccounts.map(
+            mapFinancialAccountFromApi,
+          ),
+      }));
+  
+      await refreshInventory();
+  
+      return {
+        ok: true,
+        message:
+          `فاکتور ${createdSale.invoice_number} با موفقیت ثبت شد.`,
+      };
+  
+    } catch (error) {
+      console.error(
+        'Failed to create sale:',
+        error,
+      );
+  
+      return {
+        ok: false,
+        message:
+          error.message ||
+          'ثبت فروش انجام نشد.',
+      };
+    }
   };
 
   const recordPurchase = ({ supplierId, warehouse, items, shippingIRR, customsIRR, taxIRR, otherIRR, discountIRR }) => {
@@ -1053,37 +1378,182 @@ export function ERPProvider({ children }) {
     return { ok: true, message: 'تبدیل ارز ثبت و حساب‌ها به‌روزرسانی شدند.' };
   };
 
-  const settleCustomerDebt = ({ customerId, amount }) => {
-    const customer = data.customers.find((item) => item.id === Number(customerId));
-    const payment = Number(amount);
-    if (!customer) return { ok: false, message: 'مشتری معتبر نیست.' };
-    if (payment <= 0 || payment > customer.debt) {
-      return { ok: false, message: 'مبلغ تسویه باید بیشتر از صفر و حداکثر برابر بدهی مشتری باشد.' };
+  const settleCustomerDebt =
+  async ({
+    customerId,
+    amount,
+    accountId,
+  }) => {
+
+    const customer =
+      data.customers.find(
+        (item) =>
+          item.id ===
+          Number(customerId),
+      );
+
+    const payment =
+      Number(amount);
+
+    if (!customer) {
+      return {
+        ok: false,
+        message:
+          'مشتری معتبر نیست.',
+      };
     }
 
-    const date = nowISO();
-    setData((prev) => ({
-      ...prev,
-      customers: prev.customers.map((item) =>
-        item.id === customer.id ? { ...item, debt: item.debt - payment } : item,
-      ),
-      accounts: { ...prev.accounts, irrBalance: prev.accounts.irrBalance + payment },
-      transactions: [
-        {
-          id: makeId('TX-DEBT'),
-          date,
-          type: 'settlement',
-          title: `تسویه بدهی ${customer.name}`,
-          account: 'IRR',
-          amount: payment,
-        },
-        ...prev.transactions,
-      ],
-    }));
+    if (
+      payment <= 0 ||
+      payment > customer.debt
+    ) {
+      return {
+        ok: false,
+        message:
+          'مبلغ تسویه معتبر نیست.',
+      };
+    }
 
-    return { ok: true, message: 'پرداخت بدهی مشتری ثبت شد.' };
+    if (!accountId) {
+      return {
+        ok: false,
+        message:
+          'حساب دریافت وجه را انتخاب کنید.',
+      };
+    }
+
+    try {
+      await settleCustomerDebtApi({
+        customer:
+          Number(customerId),
+
+        account:
+          Number(accountId),
+
+        payment_date:
+          new Date()
+            .toISOString()
+            .slice(0, 10),
+
+        amount:
+          tomanToIrr(payment),
+
+        payment_method:
+          'CASH',
+
+        notes:
+          `تسویه بدهی ${customer.name}`,
+      });
+
+      /*
+       * بعد از پرداخت دوباره
+       * داده واقعی Backend را بخوان.
+       */
+
+      const [
+        apiCustomers,
+        apiSales,
+        apiAccounts,
+      ] = await Promise.all([
+        getCustomers(),
+        getSales(),
+        getFinancialAccounts(),
+      ]);
+
+      const baseCustomers =
+        apiCustomers.map(
+          mapCustomerFromApi,
+        );
+
+      const customersById =
+        new Map(
+          baseCustomers.map(
+            (item) => [
+              item.id,
+              item,
+            ],
+          ),
+        );
+
+      const sales =
+        apiSales.map(
+          (sale) =>
+            mapSaleFromApi(
+              sale,
+              customersById,
+            ),
+        );
+
+      const customers =
+        baseCustomers.map(
+          (item) => {
+
+            const customerSales =
+              sales.filter(
+                (sale) =>
+                  sale.customerId ===
+                  item.id,
+              );
+
+            return {
+              ...item,
+
+              totalPurchases:
+                customerSales.reduce(
+                  (sum, sale) =>
+                    sum + sale.total,
+                  0,
+                ),
+
+              totalPaid:
+                customerSales.reduce(
+                  (sum, sale) =>
+                    sum + sale.paid,
+                  0,
+                ),
+
+              debt:
+                customerSales.reduce(
+                  (sum, sale) =>
+                    sum + sale.debt,
+                  0,
+                ),
+            };
+          },
+        );
+
+      setData((prev) => ({
+        ...prev,
+        customers,
+        sales,
+
+        financialAccounts:
+          apiAccounts.map(
+            mapFinancialAccountFromApi,
+          ),
+      }));
+
+      return {
+        ok: true,
+        message:
+          'پرداخت بدهی با موفقیت ثبت شد.',
+      };
+
+    } catch (error) {
+      console.error(
+        'Failed to settle customer debt:',
+        error,
+      );
+
+      return {
+        ok: false,
+        message:
+          error.message ||
+          'ثبت پرداخت انجام نشد.',
+      };
+    }
   };
-
+  
   const resetDemo = () => {
     setData((prev) => {
       const demo = cloneInitialData();

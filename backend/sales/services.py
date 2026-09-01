@@ -1,5 +1,5 @@
 from decimal import Decimal
-
+from uuid import uuid4
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Sum
@@ -7,7 +7,12 @@ from django.db.models import F, Sum
 from finance.models import AccountTransaction
 from parties.models import FinancialAccount
 
-from .models import CustomerReceivable, Payment, Sale
+from .models import (
+    CustomerReceivable,
+    Payment,
+    Sale,
+    SaleItem,
+)
 from inventory.models import Inventory, StockMovement
 
 @transaction.atomic
@@ -199,3 +204,181 @@ def decrease_inventory_for_sale(
     )
 
     print("SALE MOVEMENT CREATED:", movement.id)
+
+@transaction.atomic
+def create_sale_with_items_and_payment(
+    *,
+    customer,
+    sale_date,
+    items,
+    created_by,
+    paid_amount=Decimal("0.00"),
+    payment_account=None,
+    payment_method="CASH",
+    notes="",
+):
+    if not items:
+        raise ValidationError(
+            "Sale must contain at least one item."
+        )
+
+    if paid_amount < 0:
+        raise ValidationError(
+            "Paid amount cannot be negative."
+        )
+
+    if paid_amount > 0 and payment_account is None:
+        raise ValidationError(
+            "Payment account is required."
+        )
+
+    temporary_invoice_number = (
+        f"TMP-{uuid4().hex}"
+    )
+
+    sale = Sale.objects.create(
+        customer=customer,
+        invoice_number=temporary_invoice_number,
+        sale_date=sale_date,
+        notes=notes,
+        created_by_user=created_by,
+    )
+
+    # شماره فاکتور پایدار و وابسته به ID دیتابیس
+    sale.invoice_number = (
+        f"INV-{sale.pk:06d}"
+    )
+
+    sale.save(
+        update_fields=[
+            "invoice_number",
+        ]
+    )
+
+    for item_data in items:
+        item = SaleItem.objects.create(
+            sale=sale,
+            product=item_data["product"],
+            warehouse=item_data["warehouse"],
+            quantity=item_data["quantity"],
+            unit_price_irr=(
+                item_data["unit_price_irr"]
+            ),
+        )
+
+        decrease_inventory_for_sale(
+            item,
+            created_by,
+        )
+
+    recalculate_sale(
+        sale.pk
+    )
+
+    sale.refresh_from_db()
+
+    if paid_amount > sale.total_amount:
+        raise ValidationError(
+            "Payment cannot exceed sale total."
+        )
+
+    if paid_amount > 0:
+        register_payment(
+            sale=sale,
+            account=payment_account,
+            payment_date=sale_date,
+            amount=paid_amount,
+            currency_code="IRR",
+            payment_method=payment_method,
+            notes=(
+                f"Initial payment for "
+                f"{sale.invoice_number}"
+            ),
+        )
+
+    sale.refresh_from_db()
+
+    return sale
+
+@transaction.atomic
+def settle_customer_debt(
+    *,
+    customer,
+    account,
+    payment_date,
+    amount,
+    payment_method="CASH",
+    notes="",
+):
+    amount = Decimal(amount)
+
+    if amount <= 0:
+        raise ValidationError(
+            "Payment must be greater than zero."
+        )
+
+    if not account.is_active:
+        raise ValidationError(
+            "Financial account is inactive."
+        )
+
+    if account.currency_code != "IRR":
+        raise ValidationError(
+            "Customer settlement account must be IRR."
+        )
+
+    outstanding_sales = list(
+        Sale.objects
+        .select_for_update()
+        .filter(
+            customer=customer,
+            total_debt__gt=0,
+        )
+        .order_by(
+            "sale_date",
+            "id",
+        )
+    )
+
+    total_debt = sum(
+        (
+            sale.total_debt
+            for sale in outstanding_sales
+        ),
+        Decimal("0.00"),
+    )
+
+    if amount > total_debt:
+        raise ValidationError(
+            "Payment cannot exceed customer debt."
+        )
+
+    remaining = amount
+    created_payments = []
+
+    for sale in outstanding_sales:
+        if remaining <= 0:
+            break
+
+        allocation = min(
+            remaining,
+            sale.total_debt,
+        )
+
+        payment = register_payment(
+            sale=sale,
+            account=account,
+            payment_date=payment_date,
+            amount=allocation,
+            currency_code="IRR",
+            payment_method=payment_method,
+            notes=notes,
+        )
+
+        created_payments.append(
+            payment
+        )
+
+        remaining -= allocation
+
+    return created_payments

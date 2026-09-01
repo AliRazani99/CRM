@@ -4,6 +4,7 @@ from .models import (
     Customer,
     Supplier,
     Warehouse,
+    FinancialAccount,
 )
 
 
@@ -60,3 +61,21 @@ class WarehouseSerializer(
             "id",
             "created_at",
         ]
+
+class FinancialAccountSerializer(
+    serializers.ModelSerializer
+):
+    class Meta:
+        model = FinancialAccount
+
+        fields = [
+            "id",
+            "name",
+            "account_type",
+            "currency_code",
+            "current_balance",
+            "is_active",
+            "created_at",
+        ]
+
+        read_only_fields = fields

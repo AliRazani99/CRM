@@ -13,12 +13,24 @@ const blankCustomer = {
 };
 
 export default function CustomersPage() {
-  const { customers, sales, addCustomer, settleCustomerDebt } = useERP();
+  const {
+    customers,
+    sales,
+    financialAccounts = [],
+    addCustomer,
+    settleCustomerDebt,
+  } = useERP();
+  const irrAccounts =
+  financialAccounts.filter(
+    (account) =>
+      account.currencyCode === 'IRR' &&
+      account.isActive
+  );
   const [search, setSearch] = useState('');
   const [customerModal, setCustomerModal] = useState(false);
   const [settleModal, setSettleModal] = useState(false);
   const [customerForm, setCustomerForm] = useState(blankCustomer);
-  const [settleForm, setSettleForm] = useState({ customerId: customers.find((item) => item.debt > 0)?.id ?? '', amount: 0 });
+  const [settleForm, setSettleForm] = useState({ customerId: customers.find( (item) => item.debt > 0 )?.id ?? '', amount: 0, accountId: '', });
   const [customerResult, setCustomerResult] = useState(null);
   const [settleResult, setSettleResult] = useState(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? null);
@@ -44,16 +56,30 @@ export default function CustomersPage() {
     }
   };
   const openSettlement = (customer) => {
-    setSettleForm({ customerId: customer.id, amount: customer.debt });
+    setSettleForm({ customerId: customer.id, amount: customer.debt, accountId: irrAccounts[0]?.id ?? '', });
     setSettleResult(null);
     setSettleModal(true);
   };
 
-  const submitSettlement = (event) => {
+  const submitSettlement =
+  async (event) => {
+
     event.preventDefault();
-    const response = settleCustomerDebt(settleForm);
+
+    const response =
+      await settleCustomerDebt(
+        settleForm
+      );
+
     setSettleResult(response);
-    if (response.ok) setTimeout(() => setSettleModal(false), 500);
+
+    if (response.ok) {
+      setTimeout(
+        () =>
+          setSettleModal(false),
+        500,
+      );
+    }
   };
 
   return (
@@ -113,11 +139,52 @@ export default function CustomersPage() {
                   ) : null}
                 </div>
                 <div className="profile-kpis">
-                  <div><span>مجموع خرید</span><strong>{formatToman(selectedCustomer.totalPurchases)}</strong></div>
-                  <div><span>مانده بدهی</span><strong className={selectedCustomer.debt > 0 ? 'danger-text' : 'positive-text'}>{formatToman(selectedCustomer.debt)}</strong></div>
-                  <div><span>تعداد فاکتور</span><strong>{customerSales.length}</strong></div>
-                  <div><span>میانگین سبد</span><strong>{formatToman(customerSales.length ? customerSales.reduce((sum, item) => sum + item.total, 0) / customerSales.length : 0)}</strong></div>
+
+                <div>
+                  <span>مجموع خرید</span>
+
+                  <strong>
+                    {formatToman(
+                      selectedCustomer.totalPurchases
+                    )}
+                  </strong>
                 </div>
+
+                <div>
+                  <span>مجموع پرداخت</span>
+
+                  <strong className="positive-text">
+                    {formatToman(
+                      selectedCustomer.totalPaid
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>مانده بدهی</span>
+
+                  <strong
+                    className={
+                      selectedCustomer.debt > 0
+                        ? 'danger-text'
+                        : 'positive-text'
+                    }
+                  >
+                    {formatToman(
+                      selectedCustomer.debt
+                    )}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>تعداد فاکتور</span>
+
+                  <strong>
+                    {customerSales.length}
+                  </strong>
+                </div>
+
+              </div>
                 <div className="customer-contact-grid">
                   <div><span>آدرس</span><strong>{selectedCustomer.address || '—'}</strong></div>
                   <div><span>کدپستی</span><strong>{selectedCustomer.postalCode || '—'}</strong></div>
@@ -179,6 +246,38 @@ export default function CustomersPage() {
             </select>
           </Field>
           <Field label="مبلغ دریافتی" required><input type="number" min="1" value={settleForm.amount} onChange={(event) => setSettleForm({ ...settleForm, amount: event.target.value })} /></Field>
+          <Field
+            label="حساب دریافت وجه"
+            required
+          >
+            <select
+              value={
+                settleForm.accountId
+              }
+              onChange={(event) =>
+                setSettleForm({
+                  ...settleForm,
+                  accountId:
+                    event.target.value,
+                })
+              }
+            >
+              <option value="">
+                انتخاب حساب
+              </option>
+
+              {irrAccounts.map(
+                (account) => (
+                  <option
+                    key={account.id}
+                    value={account.id}
+                  >
+                    {account.name}
+                  </option>
+                )
+              )}
+            </select>
+          </Field>
           <FormMessage result={settleResult} />
           <div className="modal-actions">
             <button className="button ghost" type="button" onClick={() => setSettleModal(false)}>انصراف</button>
