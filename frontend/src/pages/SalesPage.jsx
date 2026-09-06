@@ -35,7 +35,9 @@ function createLine(products, warehouses = []) {
         unitPrice: 0,
       };
 }
-export default function SalesPage({ onNavigate }) {
+export default function SalesPage({ 
+  onNavigate 
+}) {
   const { products, customers, warehouses, sales, financialAccounts = [], recordSale, } = useERP();
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [items, setItems] = useState(() => [createLine(products)]);
@@ -432,7 +434,7 @@ const [
       <Panel title="فهرست فروش‌ها" subtitle="نمای کامل فاکتورهای ثبت‌شده">
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>فاکتور</th><th>مشتری</th><th>تاریخ</th><th>مبلغ کل</th><th>پرداخت‌شده</th><th>مانده</th><th>وضعیت</th></tr></thead>
+          <thead> <tr> <th>فاکتور</th> <th>مشتری</th> <th>تاریخ</th> <th>مبلغ کل</th> <th>پرداخت‌شده</th> <th>مانده</th> <th>وضعیت</th> <th>جزئیات</th> </tr> </thead>
             <tbody>
               {filteredSales.map((sale) => (
                 <tr key={sale.id}>
@@ -443,6 +445,7 @@ const [
                   <td>{formatToman(sale.paid)}</td>
                   <td>{formatToman(sale.debt)}</td>
                   <td><StatusBadge status={sale.status} /></td>
+                  <button className="button small secondary" type="button" onClick={() => { console.log("CLICK SALE", sale); onNavigate( "saleInvoice", sale ); }} > مشاهده </button>
                 </tr>
               ))}
             </tbody>

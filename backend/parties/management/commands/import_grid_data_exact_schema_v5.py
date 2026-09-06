@@ -22,7 +22,7 @@ from sales.services import recalculate_sale
 
 MONEY = Decimal("0.01")
 ZERO = Decimal("0.00")
-TEN = Decimal("10")
+TEN = Decimal("10000")
 
 PERSIAN_DIGITS = str.maketrans(
     "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩",

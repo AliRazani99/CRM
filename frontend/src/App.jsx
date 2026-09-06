@@ -3,6 +3,8 @@ import {
   useState,
 } from 'react';
 
+import SaleInvoicePage from './pages/SaleInvoicePage';
+
 import {
   AuthProvider,
   useAuth,
@@ -42,6 +44,7 @@ const pages = {
   suppliers: SuppliersPage,
   exchange: ExchangePage,
   finance: FinancePage,
+  saleInvoice: SaleInvoicePage,
 };
 
 
@@ -52,41 +55,65 @@ function ERPApp() {
     useState(() =>
       getDefaultPage(user)
     );
+    const [
+      selectedData,
+      setSelectedData
+     ] = useState(null);
+
+     useEffect(() => {
+
+      if (
+        activePage === "saleInvoice"
+      ) {
+        return;
+      }
+    
+    
+      if (
+        !canAccessPage(
+          user,
+          activePage,
+        )
+      ) {
+        setActivePage(
+          getDefaultPage(user)
+        );
+      }
+    
+    }, [
+      user,
+      activePage,
+    ]);
 
 
-  useEffect(() => {
-    if (
-      !canAccessPage(
-        user,
-        activePage,
-      )
-    ) {
-      setActivePage(
-        getDefaultPage(user)
-      );
-    }
-  }, [
-    user,
-    activePage,
-  ]);
-
-
-  const navigate = (pageId) => {
-    if (
-      canAccessPage(
-        user,
-        pageId,
-      )
-    ) {
-      setActivePage(pageId);
-    }
+  const navigate = (
+    pageId,
+    payload=null
+  ) => {
+  
+    console.log(
+      "NAVIGATE",
+      pageId,
+      payload
+    );
+  
+    setActivePage(pageId);
+    setSelectedData(payload);
+  
   };
 
 
   const Page =
     pages[activePage] ||
     pages[getDefaultPage(user)];
+    
 
+    console.log(
+      "ACTIVE PAGE:",
+      activePage,
+      "COMPONENT:",
+      Page?.name
+    );
 
   return (
     <MainLayout
@@ -94,7 +121,8 @@ function ERPApp() {
       onNavigate={navigate}
     >
       <Page
-        onNavigate={navigate}
+      onNavigate={navigate}
+      sale={selectedData}
       />
     </MainLayout>
   );
