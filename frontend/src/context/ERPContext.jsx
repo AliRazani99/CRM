@@ -384,6 +384,7 @@ const mapMovementFromApi = (
 const mapSaleFromApi = (
   sale,
   customersById,
+  productsById,
 ) => {
   const customerId =
     Number(sale.customer);
@@ -438,7 +439,12 @@ const mapSaleFromApi = (
         id: Number(item.id),
 
         productId:
-          Number(item.product),
+        Number(item.product),
+
+        productName:
+          productsById.get(
+            Number(item.product)
+          )?.name || "-",
 
         warehouseId:
           Number(item.warehouse),
@@ -1012,10 +1018,12 @@ export function ERPProvider({ children }) {
           apiCustomers,
           apiSales,
           apiAccounts,
+          apiProducts,
         ] = await Promise.all([
           getCustomers(),
           getSales(),
           getFinancialAccounts(),
+          getProducts(),
         ]);
   
         
@@ -1034,16 +1042,25 @@ export function ERPProvider({ children }) {
               ],
             ),
           );
-  
+          const productsById =
+          new Map(
+            apiProducts.map(
+              (product) => [
+                Number(product.id),
+                product,
+              ],
+            ),
+          );
         
         const sales =
           apiSales
             .map(
               (sale) =>
-                mapSaleFromApi(
-                  sale,
-                  customersById,
-                ),
+              mapSaleFromApi(
+                sale,
+                customersById,
+                productsById
+               )
             )
             .sort(
               (a, b) =>
@@ -1617,15 +1634,17 @@ export function ERPProvider({ children }) {
             '',
         });
   
-      const [
-        apiCustomers,
-        apiSales,
-        apiAccounts,
-      ] = await Promise.all([
-        getCustomers(),
-        getSales(),
-        getFinancialAccounts(),
-      ]);
+        const [
+          apiCustomers,
+          apiSales,
+          apiAccounts,
+          apiProducts,
+        ] = await Promise.all([
+          getCustomers(),
+          getSales(),
+          getFinancialAccounts(),
+          getProducts(),
+        ]);
   
       const baseCustomers =
         apiCustomers.map(
@@ -1645,10 +1664,11 @@ export function ERPProvider({ children }) {
       const sales =
         apiSales.map(
           (sale) =>
-            mapSaleFromApi(
-              sale,
-              customersById,
-            ),
+          mapSaleFromApi(
+            sale,
+            customersById,
+            productsById,
+          )
         );
   
       const customers =
@@ -2704,10 +2724,12 @@ export function ERPProvider({ children }) {
         apiCustomers,
         apiSales,
         apiAccounts,
+        apiProducts,
       ] = await Promise.all([
         getCustomers(),
         getSales(),
         getFinancialAccounts(),
+        getProducts(),
       ]);
 
       const baseCustomers =
@@ -2728,10 +2750,11 @@ export function ERPProvider({ children }) {
       const sales =
         apiSales.map(
           (sale) =>
-            mapSaleFromApi(
-              sale,
-              customersById,
-            ),
+          mapSaleFromApi(
+            sale,
+            customersById,
+            productsById,
+          )
         );
 
       const customers =
