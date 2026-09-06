@@ -44,6 +44,11 @@ export default function SalesPage({
   const [paidAmount, setPaidAmount] = useState(0);
   const [search, setSearch] = useState('');
   const [result, setResult] = useState(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [minTotal, setMinTotal] = useState('');
+  const [maxTotal, setMaxTotal] = useState('');
+  const [debtOnly, setDebtOnly] = useState(false);
 
   const total = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.unitPrice || 0), 0),
@@ -104,8 +109,15 @@ const [
 
   const filteredSales = sales.filter((sale) => {
     const query = search.trim().toLowerCase();
-    if (!query) return true;
-    return sale.id.toLowerCase().includes(query) || sale.customerName.toLowerCase().includes(query);
+    if (query && !sale.id.toLowerCase().includes(query) && !sale.customerName.toLowerCase().includes(query)) {
+      return false;
+    }
+    if (debtOnly && !(sale.debt > 0)) return false;
+    if (minTotal && sale.total < Number(minTotal)) return false;
+    if (maxTotal && sale.total > Number(maxTotal)) return false;
+    if (dateFrom && new Date(sale.date) < new Date(dateFrom)) return false;
+    if (dateTo && new Date(sale.date) > new Date(dateTo)) return false;
+    return true;
   });
 
   return (
@@ -432,6 +444,24 @@ const [
       </div>
 
       <Panel title="فهرست فروش‌ها" subtitle="نمای کامل فاکتورهای ثبت‌شده">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <Field label="از تاریخ">
+            <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          </Field>
+          <Field label="تا تاریخ">
+            <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          </Field>
+          <Field label="حداقل مبلغ (تومان)">
+            <input type="number" min="0" value={minTotal} onChange={(event) => setMinTotal(event.target.value)} />
+          </Field>
+          <Field label="حداکثر مبلغ (تومان)">
+            <input type="number" min="0" value={maxTotal} onChange={(event) => setMaxTotal(event.target.value)} />
+          </Field>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 20 }}>
+            <input type="checkbox" checked={debtOnly} onChange={(event) => setDebtOnly(event.target.checked)} />
+            فقط فاکتورهای بدهکار
+          </label>
+        </div>
         <div className="table-wrap">
           <table className="data-table">
           <thead> <tr> <th>فاکتور</th> <th>مشتری</th> <th>تاریخ</th> <th>مبلغ کل</th> <th>پرداخت‌شده</th> <th>مانده</th> <th>وضعیت</th> <th>جزئیات</th> </tr> </thead>

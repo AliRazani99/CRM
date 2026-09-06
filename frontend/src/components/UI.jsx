@@ -1,4 +1,4 @@
-import { X, Inbox, LoaderCircle } from 'lucide-react';
+import { X, Inbox, LoaderCircle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export function PageHeader({ title, subtitle, actions }) {
   return (
@@ -12,7 +12,9 @@ export function PageHeader({ title, subtitle, actions }) {
   );
 }
 
-export function KpiCard({ title, value, hint, icon, tone = 'indigo' }) {
+export function KpiCard({ title, value, hint, icon, tone = 'indigo', delta }) {
+  const hasDelta = typeof delta === 'number' && Number.isFinite(delta);
+  const isPositive = hasDelta && delta >= 0;
   return (
     <article className="kpi-card">
       <div className={`kpi-icon tone-${tone}`}>{icon}</div>
@@ -20,6 +22,13 @@ export function KpiCard({ title, value, hint, icon, tone = 'indigo' }) {
         <span>{title}</span>
         <strong>{value}</strong>
         {hint ? <small>{hint}</small> : null}
+        {hasDelta ? (
+          <small className={isPositive ? 'positive-text' : 'danger-text'}>
+            {isPositive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+            {' '}
+            {Math.abs(delta).toFixed(1)}٪ نسبت به بازه قبل
+          </small>
+        ) : null}
       </div>
     </article>
   );

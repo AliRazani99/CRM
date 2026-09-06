@@ -332,16 +332,53 @@ function getRange(timeframe) {
   };
 }
 
+function getPreviousRange(timeframe) {
+  const range = getRange(timeframe);
+  const duration = range.end.getTime() - range.start.getTime();
+  return {
+    start: new Date(range.start.getTime() - duration),
+    end: range.start,
+  };
+}
+
+function summarizePerformance(rows) {
+  const salesValue = rows.reduce((sum, row) => sum + row.salesValue, 0);
+  const purchaseValue = rows.reduce((sum, row) => sum + row.purchaseValue, 0);
+  const soldQty = rows.reduce((sum, row) => sum + row.soldQty, 0);
+  const purchasedQty = rows.reduce((sum, row) => sum + row.purchasedQty, 0);
+  const cogs = rows.reduce((sum, row) => sum + Number(row.cogs), 0);
+  const cogsComplete = rows.every((row) => !row.cogsMissing);
+  const grossProfit = cogsComplete ? salesValue - cogs : null;
+  const available = rows.reduce((sum, row) => sum + row.available, 0);
+  const sellThroughBase = soldQty + Math.max(available, 0);
+
+  return {
+    salesValue,
+    purchaseValue,
+    soldQty,
+    purchasedQty,
+    cogs,
+    cogsComplete,
+    grossProfit,
+    margin: grossProfit != null && salesValue > 0 ? (grossProfit / salesValue) * 100 : null,
+    averageSalePrice: soldQty > 0 ? salesValue / soldQty : 0,
+    available,
+    sellThrough: sellThroughBase > 0 ? (soldQty / sellThroughBase) * 100 : 0,
+  };
+}
+
+function pctChange(current, previous) {
+  if (current == null || previous == null || previous === 0) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
 function aggregatePerformance({
   products,
   sales,
   purchases,
-  timeframe,
+  range,
   selectedProductId,
 }) {
-  const range =
-    getRange(timeframe);
-
   const productMap =
     new Map(
       products.map(
@@ -565,6 +602,9 @@ export default function DashboardPage({ onNavigate }) {
 
   const trendData = useMemo( () => makeTimeSeries( timeframe, sales, purchases, selectedProductId, ), [ timeframe, sales, purchases, selectedProductId, ], );
 
+  const range = useMemo(() => getRange(timeframe), [timeframe]);
+  const previousRange = useMemo(() => getPreviousRange(timeframe), [timeframe]);
+
   const performanceRows =
   useMemo(
     () =>
@@ -572,7 +612,7 @@ export default function DashboardPage({ onNavigate }) {
         products,
         sales,
         purchases,
-        timeframe,
+        range,
         selectedProductId,
       }),
 
@@ -580,61 +620,25 @@ export default function DashboardPage({ onNavigate }) {
       products,
       sales,
       purchases,
-      timeframe,
+      range,
       selectedProductId,
     ],
   );
 
-  const periodMetrics = useMemo(() => {
-    const salesValue = performanceRows.reduce((sum, row) => sum + row.salesValue, 0);
-    const purchaseValue = performanceRows.reduce((sum, row) => sum + row.purchaseValue, 0);
-    const soldQty = performanceRows.reduce((sum, row) => sum + row.soldQty, 0);
-    const purchasedQty = performanceRows.reduce((sum, row) => sum + row.purchasedQty, 0);
-    const cogs =
-  performanceRows.reduce(
-    (sum, row) =>
-      sum +
-      Number(
-        row.cogs
-      ),
-    0
+  const previousPerformanceRows = useMemo(
+    () =>
+      aggregatePerformance({
+        products,
+        sales,
+        purchases,
+        range: previousRange,
+        selectedProductId,
+      }),
+    [products, sales, purchases, previousRange, selectedProductId],
   );
 
-const cogsComplete =
-  performanceRows.every(
-    (row) =>
-      !row.cogsMissing
-  );
-
-const grossProfit =
-  cogsComplete
-    ? salesValue - cogs
-    : null;
-    const available = performanceRows.reduce((sum, row) => sum + row.available, 0);
-    const sellThroughBase = soldQty + Math.max(available, 0);
-
-    return {
-      salesValue,
-      purchaseValue,
-      soldQty,
-      purchasedQty,
-      cogs,
-      cogsComplete,
-      grossProfit,
-
-      margin:
-        grossProfit != null &&
-        salesValue > 0
-          ? (
-              grossProfit /
-              salesValue
-            ) * 100
-          : null,
-      averageSalePrice: soldQty > 0 ? salesValue / soldQty : 0,
-      available,
-      sellThrough: sellThroughBase > 0 ? (soldQty / sellThroughBase) * 100 : 0,
-    };
-  }, [performanceRows]);
+  const periodMetrics = useMemo(() => summarizePerformance(performanceRows), [performanceRows]);
+  const previousPeriodMetrics = useMemo(() => summarizePerformance(previousPerformanceRows), [previousPerformanceRows]);
 
   const categoryData =
   useMemo(() => {
@@ -820,6 +824,41 @@ const grossProfit =
     return [...map.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
   }, [sales, customers, timeframe, selectedProductId]);
 
+  const agingColors = ['#34d399', '#fbbf24', '#fb7185'];
+
+  const receivablesAging = useMemo(() => {
+    const buckets = [
+      { key: '0-30', label: '۰ تا ۳۰ روز', min: 0, max: 30, total: 0, count: 0 },
+      { key: '31-60', label: '۳۱ تا ۶۰ روز', min: 31, max: 60, total: 0, count: 0 },
+      { key: '60+', label: 'بیش از ۶۰ روز', min: 61, max: Infinity, total: 0, count: 0 },
+    ];
+    const now = new Date();
+
+    sales.forEach((sale) => {
+      if (!(sale.debt > 0)) return;
+      const ageDays = Math.floor((now - new Date(sale.date)) / (24 * 60 * 60 * 1000));
+      const bucket = buckets.find((b) => ageDays >= b.min && ageDays <= b.max) ?? buckets[buckets.length - 1];
+      bucket.total += sale.debt;
+      bucket.count += 1;
+    });
+
+    return buckets;
+  }, [sales]);
+
+  const agingChartData = receivablesAging.map((bucket) => ({
+    name: bucket.label,
+    مطالبات: Math.round(bucket.total / MILLION),
+  }));
+
+  const topDebtors = useMemo(
+    () =>
+      [...customers]
+        .filter((customer) => customer.debt > 0)
+        .sort((a, b) => b.debt - a.debt)
+        .slice(0, 5),
+    [customers],
+  );
+
   const timeframeLabel = {
     today: 'امروز',
     week: 'هفت روز اخیر',
@@ -861,9 +900,9 @@ const grossProfit =
       />
 
       <div className="kpi-grid kpi-grid-4">
-        <KpiCard title="فروش در بازه" value={formatCompactToman(periodMetrics.salesValue)} hint={`${periodMetrics.soldQty} واحد فروخته‌شده`} icon={<ArrowUpRight size={21} />} tone="emerald" />
-        <KpiCard title="خرید در بازه" value={formatCompactToman(periodMetrics.purchaseValue)} hint={`${periodMetrics.purchasedQty} واحد خریداری‌شده`} icon={<ArrowDownLeft size={21} />} tone="indigo" />
-        <KpiCard title="سود ناخالص تاریخی" value={ periodMetrics.grossProfit == null ? 'نامشخص' : formatCompactToman( periodMetrics.grossProfit ) } hint={ periodMetrics.cogsComplete ? 'بر اساس بهای تمام‌شده در لحظه فروش' : 'برخی فروش‌های قدیمی فاقد COGS تاریخی هستند' } icon={ <TrendingUp size={21} /> } tone="purple" />
+        <KpiCard title="فروش در بازه" value={formatCompactToman(periodMetrics.salesValue)} hint={`${periodMetrics.soldQty} واحد فروخته‌شده`} icon={<ArrowUpRight size={21} />} tone="emerald" delta={pctChange(periodMetrics.salesValue, previousPeriodMetrics.salesValue)} />
+        <KpiCard title="خرید در بازه" value={formatCompactToman(periodMetrics.purchaseValue)} hint={`${periodMetrics.purchasedQty} واحد خریداری‌شده`} icon={<ArrowDownLeft size={21} />} tone="indigo" delta={pctChange(periodMetrics.purchaseValue, previousPeriodMetrics.purchaseValue)} />
+        <KpiCard title="سود ناخالص تاریخی" value={ periodMetrics.grossProfit == null ? 'نامشخص' : formatCompactToman( periodMetrics.grossProfit ) } hint={ periodMetrics.cogsComplete ? 'بر اساس بهای تمام‌شده در لحظه فروش' : 'برخی فروش‌های قدیمی فاقد COGS تاریخی هستند' } icon={ <TrendingUp size={21} /> } tone="purple" delta={pctChange(periodMetrics.grossProfit, previousPeriodMetrics.grossProfit)} />
         <KpiCard title="حاشیه سود" value={ periodMetrics.margin == null ? 'نامشخص' : `${periodMetrics.margin.toFixed(1)}٪` } hint={ `میانگین فروش هر واحد: ${ formatCompactToman( periodMetrics.averageSalePrice ) }` } icon={ <Percent size={21} /> } tone="amber" />
       </div>
 
@@ -1071,13 +1110,68 @@ const grossProfit =
         </Panel>
       </div>
 
+      <div className="dashboard-grid primary-grid">
+        <Panel title="سن مطالبات مشتریان" subtitle="مانده بدهی باز، بر اساس فاصله از تاریخ فاکتور (کل تاریخچه، مستقل از فیلتر بازه)" className="chart-panel span-2">
+          {agingChartData.every((bucket) => bucket.مطالبات === 0) ? (
+            <div className="mini-empty chart-empty">در حال حاضر مطالبات بازی وجود ندارد.</div>
+          ) : (
+            <div className="chart-medium">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={agingChartData} margin={{ top: 12, right: 0, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="4 4" stroke="#25314a" vertical={false} />
+                  <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} fontSize={11} />
+                  <Tooltip formatter={(value) => formatCompactToman(value * MILLION)} contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 12 }} />
+                  <Bar dataKey="مطالبات" radius={[6, 6, 0, 0]}>
+                    {agingChartData.map((entry, index) => (
+                      <Cell key={entry.name} fill={agingColors[index]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="جمع‌بندی ریسک نسیه" subtitle="تعداد و مبلغ فاکتورهای باز در هر بازه سنی">
+          <div className="finance-summary">
+            {receivablesAging.map((bucket, index) => (
+              <div className="finance-summary-row" key={bucket.key}>
+                <span>
+                  <span className="legend-dot" style={{ background: agingColors[index] }} />
+                  {' '}
+                  {bucket.label}
+                </span>
+                <strong className={index === 2 && bucket.total > 0 ? 'danger-text' : ''}>
+                  {formatToman(bucket.total)} · {bucket.count} فاکتور
+                </strong>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </div>
+
       <div className="dashboard-grid tertiary-grid">
-        <Panel title="مشتریان ارزشمند در بازه" subtitle={`رتبه‌بندی بر اساس خرید ${productLabel}`}>
+        <Panel
+          title="مشتریان ارزشمند در بازه"
+          subtitle={`رتبه‌بندی بر اساس خرید ${productLabel}`}
+          action={<button className="text-button" onClick={() => onNavigate('customers')} type="button">مشاهده مشتریان</button>}
+        >
           <div className="rank-list">
             {topCustomers.length === 0 ? (
               <div className="mini-empty">برای فیلتر فعلی مشتری ثبت نشده است.</div>
             ) : topCustomers.map((customer, index) => (
-              <div key={customer.id} className="rank-row">
+              <div
+                key={customer.id}
+                className="rank-row"
+                role="button"
+                tabIndex={0}
+                style={{ cursor: 'pointer' }}
+                onClick={() => onNavigate('customers', { customerId: customer.id })}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') onNavigate('customers', { customerId: customer.id });
+                }}
+              >
                 <span className="rank-number">{index + 1}</span>
                 <div>
                   <strong>{customer.name}</strong>
@@ -1086,6 +1180,40 @@ const grossProfit =
                 <div className="rank-amount">
                   <strong>{formatToman(customer.revenue)}</strong>
                   {customer.debt > 0 ? <small>{formatToman(customer.debt)} بدهی</small> : <small className="positive">تسویه</small>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel
+          title="بدهکاران برتر"
+          subtitle="مشتریان با بیشترین مانده بدهی (کل تاریخچه)"
+          action={<button className="text-button" onClick={() => onNavigate('customers', { debtOnly: true })} type="button">مشاهده بدهکاران</button>}
+        >
+          <div className="rank-list">
+            {topDebtors.length === 0 ? (
+              <div className="mini-empty">در حال حاضر مشتری بدهکاری وجود ندارد.</div>
+            ) : topDebtors.map((customer, index) => (
+              <div
+                key={customer.id}
+                className="rank-row"
+                role="button"
+                tabIndex={0}
+                style={{ cursor: 'pointer' }}
+                onClick={() => onNavigate('customers', { customerId: customer.id, debtOnly: true })}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') onNavigate('customers', { customerId: customer.id, debtOnly: true });
+                }}
+              >
+                <span className="rank-number">{index + 1}</span>
+                <div>
+                  <strong>{customer.name}</strong>
+                  <span>{customer.phone}</span>
+                </div>
+                <div className="rank-amount">
+                  <strong className="danger-text">{formatToman(customer.debt)}</strong>
+                  <small>از {formatToman(customer.totalPurchases)} خرید کل</small>
                 </div>
               </div>
             ))}
