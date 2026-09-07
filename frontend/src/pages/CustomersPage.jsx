@@ -12,7 +12,7 @@ const blankCustomer = {
   address: '',
 };
 
-export default function CustomersPage() {
+export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
   const {
     customers,
     sales,
@@ -33,12 +33,36 @@ export default function CustomersPage() {
   const [settleForm, setSettleForm] = useState({ customerId: customers.find( (item) => item.debt > 0 )?.id ?? '', amount: 0, accountId: '', });
   const [customerResult, setCustomerResult] = useState(null);
   const [settleResult, setSettleResult] = useState(null);
-  const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState(navPayload?.customerId ?? customers[0]?.id ?? null);
+
+  const [dateFrom, setDateFrom] = useState('');
+  const [minPurchase, setMinPurchase] = useState('');
+  const [debtOnly, setDebtOnly] = useState(navPayload?.debtOnly ?? false);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return customers.filter((customer) => !query || customer.name.toLowerCase().includes(query) || customer.phone.includes(query) || customer.instagram.toLowerCase().includes(query));
-  }, [customers, search]);
+    return customers.filter((customer) => {
+      const matchesQuery =
+        !query ||
+        customer.name.toLowerCase().includes(query) ||
+        customer.phone.includes(query) ||
+        customer.instagram.toLowerCase().includes(query);
+      if (!matchesQuery) return false;
+
+      if (debtOnly && !(customer.debt > 0)) return false;
+
+      if (minPurchase && customer.totalPurchases < Number(minPurchase)) return false;
+
+      if (dateFrom) {
+        const purchasedSince = sales.some(
+          (sale) => sale.customerId === customer.id && new Date(sale.date) >= new Date(dateFrom),
+        );
+        if (!purchasedSince) return false;
+      }
+
+      return true;
+    });
+  }, [customers, sales, search, dateFrom, minPurchase, debtOnly]);
 
   const selectedCustomer = customers.find((item) => item.id === selectedCustomerId) ?? filtered[0];
   const customerSales = selectedCustomer ? sales.filter((sale) => sale.customerId === selectedCustomer.id) : [];
@@ -99,6 +123,18 @@ export default function CustomersPage() {
           <div className="search-box wide">
             <Search size={16} />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="نام، شماره تماس یا اینستاگرام" />
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            <Field label="خرید از تاریخ">
+              <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+            </Field>
+            <Field label="حداقل مبلغ خرید (تومان)">
+              <input type="number" min="0" value={minPurchase} onChange={(event) => setMinPurchase(event.target.value)} />
+            </Field>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 20 }}>
+              <input type="checkbox" checked={debtOnly} onChange={(event) => setDebtOnly(event.target.checked)} />
+              فقط مشتریان بدهکار
+            </label>
           </div>
           <div className="customer-list">
             {filtered.map((customer) => (
@@ -194,17 +230,34 @@ export default function CustomersPage() {
               <Panel title="تاریخچه سفارش‌های مشتری" subtitle="تمام فاکتورهای ثبت‌شده برای این مشتری">
                 <div className="table-wrap">
                   <table className="data-table">
-                    <thead><tr><th>فاکتور</th><th>تاریخ</th><th>مبلغ کل</th><th>دریافتی</th><th>بدهی</th></tr></thead>
+                    <thead><tr><th>فاکتور</th><th>تاریخ</th><th>مبلغ کل</th><th>دریافتی</th><th>بدهی</th><th>جزئیات</th></tr></thead>
                     <tbody>
                       {customerSales.length === 0 ? (
-                        <tr><td colSpan="5" className="empty-cell">هنوز سفارشی برای این مشتری ثبت نشده است.</td></tr>
+                        <tr><td colSpan="6" className="empty-cell">هنوز سفارشی برای این مشتری ثبت نشده است.</td></tr>
                       ) : customerSales.map((sale) => (
-                        <tr key={sale.id}>
+                        <tr
+                          key={sale.id}
+                          className="clickable-row"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => onNavigate?.('saleInvoice', sale)}
+                        >
                           <td className="mono accent-text">{sale.id}</td>
                           <td>{formatDate(sale.date)}</td>
                           <td>{formatToman(sale.total)}</td>
                           <td>{formatToman(sale.paid)}</td>
                           <td className={sale.debt > 0 ? 'danger-text' : ''}>{formatToman(sale.debt)}</td>
+                          <td>
+                            <button
+                              className="button small secondary"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onNavigate?.('saleInvoice', sale);
+                              }}
+                            >
+                              مشاهده
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

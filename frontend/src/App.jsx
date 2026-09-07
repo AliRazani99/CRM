@@ -14,6 +14,8 @@ import {
   ERPProvider,
 } from './context/ERPContext';
 
+import { ToastProvider } from './context/ToastContext';
+
 import AuthGate from './components/AuthGate';
 
 import MainLayout from './layout/MainLayout';
@@ -133,9 +135,11 @@ export default function App() {
   return (
     <AuthProvider>
       <AuthGate>
-        <ERPProvider>
-          <ERPApp />
-        </ERPProvider>
+        <ToastProvider>
+          <ERPProvider>
+            <ERPApp />
+          </ERPProvider>
+        </ToastProvider>
       </AuthGate>
     </AuthProvider>
   );
