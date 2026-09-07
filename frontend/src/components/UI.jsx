@@ -1,4 +1,6 @@
-import { X, Inbox, LoaderCircle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Inbox, LoaderCircle, ArrowUpRight, ArrowDownRight, ChevronDown, Search } from 'lucide-react';
 
 export function PageHeader({ title, subtitle, actions }) {
   return (
@@ -125,5 +127,113 @@ export function LoadingButton({ loading, children, ...props }) {
       {loading ? <LoaderCircle size={16} className="spin" /> : null}
       {children}
     </button>
+  );
+}
+
+export function SearchableSelect({
+  value,
+  onChange,
+  options,
+  placeholder = 'انتخاب کنید',
+  searchPlaceholder = 'جستجو...',
+  emptyLabel = 'موردی یافت نشد',
+  disabled = false,
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [position, setPosition] = useState(null);
+  const containerRef = useRef(null);
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+
+  const updatePosition = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPosition({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+  };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    updatePosition();
+    const handleReposition = () => updatePosition();
+    window.addEventListener('scroll', handleReposition, true);
+    window.addEventListener('resize', handleReposition);
+    return () => {
+      window.removeEventListener('scroll', handleReposition, true);
+      window.removeEventListener('resize', handleReposition);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      const insideTrigger = containerRef.current?.contains(event.target);
+      const insidePanel = panelRef.current?.contains(event.target);
+      if (!insideTrigger && !insidePanel) {
+        setOpen(false);
+        setQuery('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = options.find((option) => String(option.value) === String(value));
+
+  const filtered = options.filter((option) => {
+    if (!query.trim()) return true;
+    const haystack = `${option.label} ${option.sublabel ?? ''}`.toLowerCase();
+    return haystack.includes(query.trim().toLowerCase());
+  });
+
+  return (
+    <div className={`searchable-select ${disabled ? 'disabled' : ''}`} ref={containerRef}>
+      <button
+        type="button"
+        ref={triggerRef}
+        className="searchable-select-trigger"
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className={selected ? '' : 'placeholder'}>{selected ? selected.label : placeholder}</span>
+        <ChevronDown size={16} />
+      </button>
+      {open && position
+        ? createPortal(
+            <div
+              ref={panelRef}
+              className="searchable-select-panel"
+              style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
+            >
+              <div className="searchable-select-search">
+                <Search size={14} />
+                <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchPlaceholder} />
+              </div>
+              <div className="searchable-select-options">
+                {filtered.length === 0 ? (
+                  <div className="searchable-select-empty">{emptyLabel}</div>
+                ) : (
+                  filtered.map((option) => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      className={`searchable-select-option ${String(option.value) === String(value) ? 'active' : ''} ${option.disabled ? 'disabled' : ''}`}
+                      disabled={option.disabled}
+                      onClick={() => {
+                        onChange(option.value);
+                        setOpen(false);
+                        setQuery('');
+                      }}
+                    >
+                      <span>{option.label}</span>
+                      {option.sublabel ? <small>{option.sublabel}</small> : null}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
   );
 }

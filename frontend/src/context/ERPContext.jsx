@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { initialData } from '../data/initialData';
+import { useToast } from './ToastContext';
 import {
   irrToToman,
   makeId,
@@ -826,6 +827,19 @@ const buildAccountSummary = (
 
 export function ERPProvider({ children }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
+
+  const withToast = useCallback(
+    (fn) =>
+      async (...args) => {
+        const result = await fn(...args);
+        if (result && typeof result === 'object' && 'ok' in result) {
+          showToast(result.message, result.ok ? 'success' : 'error');
+        }
+        return result;
+      },
+    [showToast],
+  );
 
   const roleCode = user?.role_code ?? null;
 
@@ -3037,25 +3051,25 @@ const grossProfit =
   
     metrics,
   
-    addProduct,
-    addCustomer,
-    addSupplier,
-    addWarehouse,
-  
-    addFinancialAccount,
-    updateFinancialAccount,
-  
-    recordSale,
-    recordPurchase,
-  
-    transferStock,
+    addProduct: withToast(addProduct),
+    addCustomer: withToast(addCustomer),
+    addSupplier: withToast(addSupplier),
+    addWarehouse: withToast(addWarehouse),
+
+    addFinancialAccount: withToast(addFinancialAccount),
+    updateFinancialAccount: withToast(updateFinancialAccount),
+
+    recordSale: withToast(recordSale),
+    recordPurchase: withToast(recordPurchase),
+
+    transferStock: withToast(transferStock),
     refreshInventory,
-  
-    recordExchange,
+
+    recordExchange: withToast(recordExchange),
     refreshFinance,
-  
-    settleCustomerDebt,
-  
+
+    settleCustomerDebt: withToast(settleCustomerDebt),
+
     resetDemo,
   };
 

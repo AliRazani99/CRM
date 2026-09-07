@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CreditCard, Plus, ReceiptText, Search, ShoppingCart, Trash2, UserPlus } from 'lucide-react';
 import { useERP } from '../context/ERPContext';
-import { EmptyState, Field, FormMessage, PageHeader, Panel, StatusBadge } from '../components/UI';
+import { EmptyState, Field, FormMessage, PageHeader, Panel, SearchableSelect, StatusBadge } from '../components/UI';
 import { formatDate, formatToman } from '../utils/formatters';
 
 function createLine(products, warehouses = []) {
@@ -49,6 +49,35 @@ export default function SalesPage({
   const [minTotal, setMinTotal] = useState('');
   const [maxTotal, setMaxTotal] = useState('');
   const [debtOnly, setDebtOnly] = useState(false);
+  const [inStockOnly, setInStockOnly] = useState(true);
+
+  const productStock = useMemo(() => {
+    const map = new Map();
+    products.forEach((product) => {
+      const totalAvailable = (product.inventories ?? []).reduce((sum, inv) => sum + (inv.qtyAvailable ?? 0), 0);
+      map.set(product.id, totalAvailable);
+    });
+    return map;
+  }, [products]);
+
+  const customerOptions = useMemo(
+    () => customers.map((customer) => ({ value: customer.id, label: customer.name, sublabel: customer.phone })),
+    [customers],
+  );
+
+  const productOptionsFor = (selectedProductId) => {
+    const relevant = inStockOnly
+      ? products.filter((item) => productStock.get(item.id) > 0 || item.id === Number(selectedProductId))
+      : products;
+    return relevant.map((item) => {
+      const available = productStock.get(item.id) ?? 0;
+      return {
+        value: item.id,
+        label: `${item.name} — ${item.sku}`,
+        sublabel: available > 0 ? `موجود: ${available}` : 'ناموجود',
+      };
+    });
+  };
 
   const total = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.unitPrice || 0), 0),
@@ -137,12 +166,14 @@ const [
           <form onSubmit={submit} className="form-stack">
             <div className="form-grid two-columns">
               <Field label="مشتری" required>
-                <select value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
-                  <option value="">انتخاب مشتری</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>{customer.name} — {customer.phone}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={customerId}
+                  onChange={setCustomerId}
+                  options={customerOptions}
+                  placeholder="انتخاب مشتری"
+                  searchPlaceholder="جستجوی نام یا شماره تماس..."
+                  emptyLabel="مشتری‌ای یافت نشد"
+                />
               </Field>
               <Field label="تاریخ ثبت">
                 <input value={new Intl.DateTimeFormat('fa-IR', { dateStyle: 'long' }).format(new Date())} disabled />
@@ -154,6 +185,10 @@ const [
                 <strong>اقلام فاکتور</strong>
                 <span>قیمت فروش هر ردیف قابل ویرایش است</span>
               </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="checkbox" checked={inStockOnly} onChange={(event) => setInStockOnly(event.target.checked)} />
+                فقط کالاهای موجود
+              </label>
               <button className="button ghost small" type="button" onClick={addLine}>
                 <Plus size={16} /> افزودن ردیف
               </button>
@@ -194,35 +229,14 @@ const [
                 >
 
                   <div>
-                    <select
+                    <SearchableSelect
                       value={line.productId}
-                      onChange={(event) =>
-                        updateLine(
-                          line.rowId,
-                          {
-                            productId:
-                              event.target.value,
-                          }
-                        )
-                      }
-                    >
-                      <option value="">
-                        انتخاب کالا
-                      </option>
-
-                      {products.map(
-                        (item) => (
-                          <option
-                            key={item.id}
-                            value={item.id}
-                          >
-                            {item.name}
-                            {' — '}
-                            {item.sku}
-                          </option>
-                        )
-                      )}
-                    </select>
+                      onChange={(newValue) => updateLine(line.rowId, { productId: newValue })}
+                      options={productOptionsFor(line.productId)}
+                      placeholder="انتخاب کالا"
+                      searchPlaceholder="جستجوی نام یا کد کالا..."
+                      emptyLabel={inStockOnly ? 'کالای موجودی یافت نشد' : 'کالایی یافت نشد'}
+                    />
 
                     <small
                       className={

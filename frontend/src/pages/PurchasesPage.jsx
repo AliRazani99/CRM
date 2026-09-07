@@ -21,6 +21,7 @@ import {
   FormMessage,
   PageHeader,
   Panel,
+  SearchableSelect,
 } from '../components/UI';
 
 import {
@@ -321,6 +322,33 @@ export default function PurchasesPage({
     );
 
 
+  const productStock = useMemo(() => {
+    const map = new Map();
+    products.forEach((product) => {
+      const totalAvailable = (product.inventories ?? []).reduce((sum, inv) => sum + (inv.qtyAvailable ?? 0), 0);
+      map.set(product.id, totalAvailable);
+    });
+    return map;
+  }, [products]);
+
+  const supplierOptions = useMemo(
+    () => suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name, sublabel: supplier.country })),
+    [suppliers],
+  );
+
+  const productOptions = useMemo(
+    () =>
+      products.map((product) => {
+        const available = productStock.get(product.id) ?? 0;
+        return {
+          value: product.id,
+          label: `${product.name} — ${product.sku}`,
+          sublabel: `موجود فعلی: ${available}`,
+        };
+      }),
+    [products, productStock],
+  );
+
   const updateLine = (
     rowId,
     patch,
@@ -475,41 +503,14 @@ export default function PurchasesPage({
                 label="تأمین‌کننده"
                 required
               >
-                <select
-                  required
-                  value={
-                    supplierId
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setSupplierId(
-                      event.target
-                        .value
-                    )
-                  }
-                >
-                  <option value="">
-                    انتخاب تأمین‌کننده
-                  </option>
-
-                  {suppliers.map(
-                    (supplier) => (
-                      <option
-                        key={
-                          supplier.id
-                        }
-                        value={
-                          supplier.id
-                        }
-                      >
-                        {supplier.name}
-                        {' — '}
-                        {supplier.country}
-                      </option>
-                    ),
-                  )}
-                </select>
+                <SearchableSelect
+                  value={supplierId}
+                  onChange={setSupplierId}
+                  options={supplierOptions}
+                  placeholder="انتخاب تأمین‌کننده"
+                  searchPlaceholder="جستجوی نام یا کشور..."
+                  emptyLabel="تأمین‌کننده‌ای یافت نشد"
+                />
               </Field>
 
               <Field
@@ -726,50 +727,14 @@ export default function PurchasesPage({
                     }
                   >
 
-                    <select
-                      required
-                      value={
-                        line.productId
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        updateLine(
-                          line.rowId,
-                          {
-                            productId:
-                              event
-                                .target
-                                .value,
-                          },
-                        )
-                      }
-                    >
-                      <option value="">
-                        انتخاب کالا
-                      </option>
-
-                      {products.map(
-                        (product) => (
-                          <option
-                            key={
-                              product.id
-                            }
-                            value={
-                              product.id
-                            }
-                          >
-                            {
-                              product.name
-                            }
-                            {' — '}
-                            {
-                              product.sku
-                            }
-                          </option>
-                        ),
-                      )}
-                    </select>
+                    <SearchableSelect
+                      value={line.productId}
+                      onChange={(newValue) => updateLine(line.rowId, { productId: newValue })}
+                      options={productOptions}
+                      placeholder="انتخاب کالا"
+                      searchPlaceholder="جستجوی نام یا کد کالا..."
+                      emptyLabel="کالایی یافت نشد"
+                    />
 
                     <input
                       required
