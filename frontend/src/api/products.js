@@ -22,3 +22,6 @@ export function getCategories() {
 export function getBrands() {
   return apiRequest('/brands/');
 }
+export function getProductBuyers(productId) {
+  return apiRequest(`/products/${productId}/buyers/`);
+}

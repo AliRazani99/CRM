@@ -1,5 +1,6 @@
 :root {
-  font-family: Tahoma, Arial, sans-serif;
+  font-family: 'Vazirmatn', Tahoma, Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
   color: #e2e8f0;
   background: #020617;
   font-synthesis: none;
@@ -38,6 +39,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  line-height: 1.7;
   background:
     radial-gradient(circle at 15% 20%, rgba(99, 102, 241, 0.12), transparent 30%),
     radial-gradient(circle at 85% 80%, rgba(16, 185, 129, 0.08), transparent 26%),
@@ -1427,7 +1429,27 @@ textarea {
   align-items: center;
   gap: 9px;
 }
+.product-name-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: right;
+  cursor: pointer;
+}
 
+.product-name-button:hover .product-cell strong,
+.product-name-button:focus-visible .product-cell strong {
+  color: var(--indigo-light);
+  text-decoration: underline;
+}
+
+.product-name-button:focus-visible {
+  outline: 2px solid var(--indigo-light);
+  outline-offset: 4px;
+}
 .product-avatar {
   width: 32px;
   height: 32px;

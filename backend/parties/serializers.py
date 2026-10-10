@@ -26,6 +26,56 @@ class CustomerSerializer(
             "id",
             "full_name",
             "phone",
+            "email",
+            "instagram_handle",
+            "birth_date",
+            "postal_code",
+            "address",
+            "created_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "created_at",
+        ]
+
+    def validate(self, attrs):
+        # هنگام ویرایش جزئی، فیلدهای ارسال‌نشده
+        # از اطلاعات فعلی مشتری خوانده می‌شوند.
+        phone = attrs.get(
+            "phone",
+            getattr(self.instance, "phone", ""),
+        )
+
+        email = attrs.get(
+            "email",
+            getattr(self.instance, "email", ""),
+        )
+
+        instagram = attrs.get(
+            "instagram_handle",
+            getattr(self.instance, "instagram_handle", ""),
+        )
+
+        if not any(
+            str(value or "").strip()
+            for value in (phone, email, instagram)
+        ):
+            raise serializers.ValidationError({
+                "non_field_errors": [
+                    "حداقل یکی از شماره تلفن، ایمیل "
+                    "یا اینستاگرام باید وارد شود."
+                ],
+            })
+
+        return attrs
+    class Meta:
+        model = Customer
+
+        fields = [
+            "id",
+            "full_name",
+            "phone",
             "instagram_handle",
             "postal_code",
             "address",

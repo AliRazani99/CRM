@@ -7,7 +7,9 @@ import { formatDate, formatToman } from '../utils/formatters';
 const blankCustomer = {
   name: '',
   phone: '',
+  email: '',
   instagram: '',
+  birthDate: '',
   postalCode: '',
   address: '',
 };
@@ -18,6 +20,7 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
     sales,
     financialAccounts = [],
     addCustomer,
+    updateCustomer,
     settleCustomerDebt,
   } = useERP();
   const irrAccounts =
@@ -28,6 +31,8 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
   );
   const [search, setSearch] = useState('');
   const [customerModal, setCustomerModal] = useState(false);
+  const [editingCustomerId, setEditingCustomerId] =
+  useState(null);
   const [settleModal, setSettleModal] = useState(false);
   const [customerForm, setCustomerForm] = useState(blankCustomer);
   const [settleForm, setSettleForm] = useState({ customerId: customers.find( (item) => item.debt > 0 )?.id ?? '', amount: 0, accountId: '', });
@@ -45,8 +50,9 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
       const matchesQuery =
         !query ||
         customer.name.toLowerCase().includes(query) ||
-        customer.phone.includes(query) ||
-        customer.instagram.toLowerCase().includes(query);
+        (customer.phone ?? '').includes(query) ||
+        (customer.email ?? '').toLowerCase().includes(query) ||
+        (customer.instagram ?? '').toLowerCase().includes(query);
       if (!matchesQuery) return false;
 
       if (debtOnly && !(customer.debt > 0)) return false;
@@ -67,18 +73,80 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
   const selectedCustomer = customers.find((item) => item.id === selectedCustomerId) ?? filtered[0];
   const customerSales = selectedCustomer ? sales.filter((sale) => sale.customerId === selectedCustomer.id) : [];
 
+  
+  const openNewCustomer = () => {
+    setEditingCustomerId(null);
+    setCustomerForm({ ...blankCustomer });
+    setCustomerResult(null);
+    setCustomerModal(true);
+  };
+  
+  const openEditCustomer = (customer) => {
+    setEditingCustomerId(customer.id);
+  
+    setCustomerForm({
+      name: customer.name ?? '',
+      phone: customer.phone ?? '',
+      email: customer.email ?? '',
+      instagram: customer.instagram ?? '',
+      birthDate: customer.birthDate ?? '',
+      postalCode: customer.postalCode ?? '',
+      address: customer.address ?? '',
+    });
+  
+    setCustomerResult(null);
+    setCustomerModal(true);
+  };
+  
   const submitCustomer = async (event) => {
     event.preventDefault();
   
-    const response = await addCustomer(customerForm);
+    if (!customerForm.name.trim()) {
+      setCustomerResult({
+        ok: false,
+        message: 'نام مشتری الزامی است.',
+      });
+      return;
+    }
+  
+    if (
+      !customerForm.phone.trim() &&
+      !customerForm.email.trim() &&
+      !customerForm.instagram.trim()
+    ) {
+      setCustomerResult({
+        ok: false,
+        message:
+          'حداقل یکی از شماره تلفن، ایمیل ' +
+          'یا اینستاگرام باید وارد شود.',
+      });
+      return;
+    }
+  
+    const response =
+      editingCustomerId === null
+        ? await addCustomer(customerForm)
+        : await updateCustomer(
+            editingCustomerId,
+            customerForm,
+          );
   
     setCustomerResult(response);
   
     if (response.ok) {
-      setCustomerForm(blankCustomer);
-      setTimeout(() => setCustomerModal(false), 500);
+      if (response.customerId != null) {
+        setSelectedCustomerId(response.customerId);
+      }
+  
+      setTimeout(() => {
+        setCustomerModal(false);
+        setEditingCustomerId(null);
+        setCustomerForm({ ...blankCustomer });
+        setCustomerResult(null);
+      }, 500);
     }
   };
+
   const openSettlement = (customer) => {
     setSettleForm({ customerId: customer.id, amount: customer.debt, accountId: irrAccounts[0]?.id ?? '', });
     setSettleResult(null);
@@ -112,7 +180,7 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
         title="مشتریان و مطالبات"
         subtitle="پروفایل مشتری، سابقه خرید، مانده بدهی و ثبت تسویه"
         actions={(
-          <button className="button primary" type="button" onClick={() => setCustomerModal(true)}>
+          <button className="button primary" type="button" onClick={openNewCustomer}>
             <UserPlus size={17} /> مشتری جدید
           </button>
         )}
@@ -122,7 +190,7 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
         <Panel className="customer-list-panel">
           <div className="search-box wide">
             <Search size={16} />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="نام، شماره تماس یا اینستاگرام" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="نام، شماره تماس، ایمیل یا اینستاگرام" />
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
             <Field label="خرید از تاریخ">
@@ -147,7 +215,7 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
                 <div className="customer-avatar"><UsersRound size={18} /></div>
                 <div className="customer-list-copy">
                   <strong>{customer.name}</strong>
-                  <span>{customer.phone}</span>
+                  <span> {customer.phone || customer.email || customer.instagram || 'بدون اطلاعات تماس'} </span>
                 </div>
                 <div className="customer-list-value">
                   <strong className={customer.debt > 0 ? 'danger-text' : 'positive-text'}>{formatToman(customer.debt)}</strong>
@@ -166,14 +234,28 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
                   <div className="large-avatar"><UsersRound size={26} /></div>
                   <div className="customer-profile-title">
                     <h2>{selectedCustomer.name}</h2>
-                    <span>{selectedCustomer.phone} • {selectedCustomer.instagram || 'بدون اینستاگرام'}</span>
+                    <span> {selectedCustomer.phone || selectedCustomer.email || selectedCustomer.instagram || 'اطلاعات تماس ثبت نشده'} </span>
                   </div>
+                  <div className="modal-actions">
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => openEditCustomer(selectedCustomer)}
+                  >
+                    ویرایش مشتری
+                  </button>
+
                   {selectedCustomer.debt > 0 ? (
-                    <button className="button primary" type="button" onClick={() => openSettlement(selectedCustomer)}>
+                    <button
+                      className="button primary"
+                      type="button"
+                      onClick={() => openSettlement(selectedCustomer)}
+                    >
                       <CreditCard size={17} /> ثبت تسویه
                     </button>
                   ) : null}
                 </div>
+                </div>  
                 <div className="profile-kpis">
 
                 <div>
@@ -221,10 +303,41 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
                 </div>
 
               </div>
-                <div className="customer-contact-grid">
-                  <div><span>آدرس</span><strong>{selectedCustomer.address || '—'}</strong></div>
-                  <div><span>کدپستی</span><strong>{selectedCustomer.postalCode || '—'}</strong></div>
-                </div>
+              <div className="customer-contact-grid">
+  <div>
+    <span>شماره تلفن</span>
+    <strong>{selectedCustomer.phone || '—'}</strong>
+  </div>
+
+  <div>
+    <span>ایمیل</span>
+    <strong>{selectedCustomer.email || '—'}</strong>
+  </div>
+
+  <div>
+    <span>اینستاگرام</span>
+    <strong>{selectedCustomer.instagram || '—'}</strong>
+  </div>
+
+  <div>
+    <span>تاریخ تولد</span>
+    <strong>
+      {selectedCustomer.birthDate
+        ? formatDate(selectedCustomer.birthDate)
+        : '—'}
+    </strong>
+  </div>
+
+  <div>
+    <span>آدرس</span>
+    <strong>{selectedCustomer.address || '—'}</strong>
+  </div>
+
+  <div>
+    <span>کدپستی</span>
+    <strong>{selectedCustomer.postalCode || '—'}</strong>
+  </div>
+</div>
               </Panel>
 
               <Panel title="تاریخچه سفارش‌های مشتری" subtitle="تمام فاکتورهای ثبت‌شده برای این مشتری">
@@ -271,22 +384,139 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
         </div>
       </div>
 
-      <Modal open={customerModal} onClose={() => setCustomerModal(false)} title="ثبت مشتری جدید" subtitle="اطلاعات هویتی و ارتباطی مشتری را وارد کنید" width="720px">
-        <form onSubmit={submitCustomer} className="form-stack">
-          <div className="form-grid two-columns">
-            <Field label="نام و نام خانوادگی" required><input value={customerForm.name} onChange={(event) => setCustomerForm({ ...customerForm, name: event.target.value })} /></Field>
-            <Field label="شماره تماس" required><input value={customerForm.phone} onChange={(event) => setCustomerForm({ ...customerForm, phone: event.target.value })} dir="ltr" /></Field>
-            <Field label="اینستاگرام"><input value={customerForm.instagram} onChange={(event) => setCustomerForm({ ...customerForm, instagram: event.target.value })} dir="ltr" /></Field>
-            <Field label="کدپستی"><input value={customerForm.postalCode} onChange={(event) => setCustomerForm({ ...customerForm, postalCode: event.target.value })} /></Field>
-          </div>
-          <Field label="آدرس"><textarea rows="3" value={customerForm.address} onChange={(event) => setCustomerForm({ ...customerForm, address: event.target.value })} /></Field>
-          <FormMessage result={customerResult} />
-          <div className="modal-actions">
-            <button className="button ghost" type="button" onClick={() => setCustomerModal(false)}>انصراف</button>
-            <button className="button primary" type="submit"><UserPlus size={16} /> ثبت مشتری</button>
-          </div>
-        </form>
-      </Modal>
+      <Modal
+  open={customerModal}
+  onClose={() => setCustomerModal(false)}
+  title={
+    editingCustomerId === null
+      ? 'ثبت مشتری جدید'
+      : 'ویرایش اطلاعات مشتری'
+  }
+  subtitle="نام مشتری و حداقل یک راه ارتباطی را وارد کنید"
+  width="720px"
+>
+  <form onSubmit={submitCustomer} className="form-stack">
+    <div className="form-grid two-columns">
+      <Field label="نام و نام خانوادگی" required>
+        <input
+          required
+          value={customerForm.name}
+          onChange={(event) =>
+            setCustomerForm({
+              ...customerForm,
+              name: event.target.value,
+            })
+          }
+        />
+      </Field>
+
+      <Field label="شماره تلفن">
+        <input
+          type="tel"
+          dir="ltr"
+          value={customerForm.phone}
+          onChange={(event) =>
+            setCustomerForm({
+              ...customerForm,
+              phone: event.target.value,
+            })
+          }
+        />
+      </Field>
+
+      <Field label="ایمیل">
+        <input
+          type="email"
+          dir="ltr"
+          value={customerForm.email}
+          onChange={(event) =>
+            setCustomerForm({
+              ...customerForm,
+              email: event.target.value,
+            })
+          }
+        />
+      </Field>
+
+      <Field label="اینستاگرام (آدرس یا نام کاربری)">
+        <input
+          dir="ltr"
+          placeholder="@username یا لینک صفحه"
+          value={customerForm.instagram}
+          onChange={(event) =>
+            setCustomerForm({
+              ...customerForm,
+              instagram: event.target.value,
+            })
+          }
+        />
+      </Field>
+
+      <Field label="تاریخ تولد (اختیاری)">
+        <input
+          type="date"
+          value={customerForm.birthDate}
+          onChange={(event) =>
+            setCustomerForm({
+              ...customerForm,
+              birthDate: event.target.value,
+            })
+          }
+        />
+      </Field>
+
+      <Field label="کدپستی">
+        <input
+          value={customerForm.postalCode}
+          onChange={(event) =>
+            setCustomerForm({
+              ...customerForm,
+              postalCode: event.target.value,
+            })
+          }
+        />
+      </Field>
+    </div>
+
+    <Field label="آدرس">
+      <textarea
+        rows="3"
+        value={customerForm.address}
+        onChange={(event) =>
+          setCustomerForm({
+            ...customerForm,
+            address: event.target.value,
+          })
+        }
+      />
+    </Field>
+
+    <p className="muted-text">
+      از بین شماره تلفن، ایمیل و اینستاگرام،
+      وارد کردن حداقل یکی الزامی است.
+      
+    </p>
+
+    <FormMessage result={customerResult} />
+
+    <div className="modal-actions">
+      <button
+        className="button ghost"
+        type="button"
+        onClick={() => setCustomerModal(false)}
+      >
+        انصراف
+      </button>
+
+      <button className="button primary" type="submit">
+        <UserPlus size={16} />
+        {editingCustomerId === null
+          ? 'ثبت مشتری'
+          : 'ذخیره تغییرات'}
+      </button>
+    </div>
+  </form>
+</Modal>
 
       <Modal open={settleModal} onClose={() => setSettleModal(false)} title="ثبت تسویه بدهی" subtitle="مبلغ دریافتی به حساب ریالی اضافه می‌شود">
         <form onSubmit={submitSettlement} className="form-stack">

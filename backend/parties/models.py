@@ -1,5 +1,5 @@
 from django.db import models
-
+from django.core.exceptions import ValidationError
 
 class Customer(models.Model):
     full_name = models.CharField(
@@ -15,6 +15,15 @@ class Customer(models.Model):
         max_length=100,
         blank=True,
     )
+    email = models.EmailField(
+        blank=True,
+        default="",
+    )
+
+    birth_date = models.DateField(
+        null=True,
+        blank=True,
+    )
 
     postal_code = models.CharField(
         max_length=30,
@@ -28,6 +37,25 @@ class Customer(models.Model):
     created_at = models.DateTimeField(
         auto_now_add=True,
     )
+    def clean(self):
+        super().clean()
+
+        contact_values = (
+            self.phone,
+            self.email,
+            self.instagram_handle,
+        )
+
+        if not any(
+            str(value or "").strip()
+            for value in contact_values
+        ):
+            raise ValidationError({
+                "phone": (
+                    "حداقل یکی از شماره تلفن، ایمیل "
+                    "یا اینستاگرام باید ثبت شود."
+                ),
+            })
 
     def __str__(self):
         return self.full_name
