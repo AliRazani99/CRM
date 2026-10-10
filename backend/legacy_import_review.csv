@@ -1,0 +1,177 @@
+﻿entity,csv_row,purchase_id,issue,details
+customer,48,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,117,,BIRTH_MONTH_ONLY,Only month is known; cannot fabricate a full birth_date
+customer,158,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,223,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,251,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,260,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,265,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,323,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,374,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,451,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,452,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,453,,EMBEDDED_PHONE_UNRESOLVED,Review packed name manually
+customer,453,,MALFORMED_NAME_SKIPPED,"Address/number-like name, no linked sale or contact"
+customer,454,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,455,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,456,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,457,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,458,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,459,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,460,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,461,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,462,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,466,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,467,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,468,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,469,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,470,,RECOVERED_PACKED_CONTACT,Name/phone/address split only at explicit phone/handle delimiters
+customer,471,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,472,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,473,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,474,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,475,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,476,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,477,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,478,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,479,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,480,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,481,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,482,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,483,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,484,,EMPTY_CUSTOMER_NAME,No customer name; row cannot be identified
+customer,485,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,486,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,487,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,489,,MALFORMED_NAME_SKIPPED,"Address/number-like name, no linked sale or contact"
+customer,490,,MALFORMED_NAME_SKIPPED,"Address/number-like name, no linked sale or contact"
+customer,491,,MALFORMED_NAME_SKIPPED,"Address/number-like name, no linked sale or contact"
+customer,492,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,493,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+customer,494,,HISTORICAL_CONTACT_MISSING,Import as legacy incomplete; new CRM entries still require contact
+product,"59,66",,DUPLICATE_MASTER_NAME,Same normalized product name appears in multiple master rows; merged by name
+product,"128,133",,DUPLICATE_MASTER_NAME,Same normalized product name appears in multiple master rows; merged by name
+purchase,325,341,QUANTITY_UNKNOWN,2 total items across 5 distinct listed components; per-item quantities unknown
+purchase,335,352,QUANTITY_UNKNOWN,1 total items across 2 distinct listed components; per-item quantities unknown
+purchase,450,467,QUANTITY_UNKNOWN,3 total items across 2 distinct listed components; per-item quantities unknown
+purchase,473,490,QUANTITY_UNKNOWN,3 total items across 2 distinct listed components; per-item quantities unknown
+purchase,504,522,QUANTITY_UNKNOWN,4 total items across 2 distinct listed components; per-item quantities unknown
+purchase,517,536,QUANTITY_UNKNOWN,13 total items across 10 distinct listed components; per-item quantities unknown
+purchase,521,540,QUANTITY_UNKNOWN,3 total items across 2 distinct listed components; per-item quantities unknown
+purchase,522,541,QUANTITY_UNKNOWN,6 total items across 3 distinct listed components; per-item quantities unknown
+purchase,524,543,QUANTITY_UNKNOWN,5 total items across 3 distinct listed components; per-item quantities unknown
+purchase,525,544,QUANTITY_UNKNOWN,3 total items across 2 distinct listed components; per-item quantities unknown
+purchase,529,548,QUANTITY_UNKNOWN,5 total items across 4 distinct listed components; per-item quantities unknown
+purchase,532,551,QUANTITY_UNKNOWN,5 total items across 4 distinct listed components; per-item quantities unknown
+purchase,534,553,QUANTITY_UNKNOWN,3 total items across 2 distinct listed components; per-item quantities unknown
+purchase,536,555,QUANTITY_UNKNOWN,5 total items across 3 distinct listed components; per-item quantities unknown
+purchase,545,564,QUANTITY_UNKNOWN,5 total items across 3 distinct listed components; per-item quantities unknown
+purchase,557,576,QUANTITY_UNKNOWN,2 total items across 3 distinct listed components; per-item quantities unknown
+purchase,565,584,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,585,605,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,586,606,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,587,607,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,588,608,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,590,610,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,591,611,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,592,612,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,596,616,QUANTITY_UNKNOWN,3 total items across 2 distinct listed components; per-item quantities unknown
+purchase,599,619,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,603,623,QUANTITY_UNKNOWN,4 total items across 3 distinct listed components; per-item quantities unknown
+purchase,621,641,QUANTITY_UNKNOWN,4 total items across 3 distinct listed components; per-item quantities unknown
+purchase,624,644,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,625,645,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,626,646,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,627,647,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,628,648,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,629,649,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,631,651,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,632,652,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,633,653,PRODUCT_IDENTITY_UNKNOWN,Invoice and customer preserved; source product blank
+purchase,635,655,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,636,656,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,637,657,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,638,658,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,639,659,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,640,660,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,641,661,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,642,662,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,643,663,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,644,664,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,645,665,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,646,666,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,647,667,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,648,668,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,649,669,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,650,670,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,651,671,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,652,672,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,653,673,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,654,674,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,655,675,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,656,676,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,657,677,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,658,678,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,659,679,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,660,680,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,661,681,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,662,682,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,663,683,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,664,684,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,665,685,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,666,686,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,667,687,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,668,688,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,669,689,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,670,690,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,671,691,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,672,692,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,673,693,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,674,694,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,675,695,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,676,696,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,677,697,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,678,698,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,679,699,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,680,700,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,681,701,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,682,702,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,683,703,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,684,704,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,685,705,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,686,706,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,687,707,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,688,708,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,689,709,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,690,710,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,691,711,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,692,712,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,693,713,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,694,714,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,695,715,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,696,716,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,697,717,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,698,718,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,699,719,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,700,720,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,701,721,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,702,722,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,703,723,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,704,724,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,705,725,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,706,726,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,707,727,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,708,728,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,709,729,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,710,730,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,711,731,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,712,732,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,713,733,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,714,734,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,715,735,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,716,736,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,717,737,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,718,738,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,719,739,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,720,740,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale
+purchase,721,741,BLANK_PURCHASE_ROW,No customer/product/invoice; not a sale

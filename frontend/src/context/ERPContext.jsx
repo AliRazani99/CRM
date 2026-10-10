@@ -20,6 +20,8 @@ import {
 
   updateFinancialAccount
     as updateFinancialAccountApi,
+
+  updateCustomer as updateCustomerApi,
 } from '../api/parties';
 
 import {
@@ -327,14 +329,17 @@ const mapTransferFromApi = (transfer) => ({
   notes:
     transfer.notes || '',
 });
+
 const mapCustomerFromApi = (customer) => ({
   id: Number(customer.id),
 
-  name: customer.full_name,
-  phone: customer.phone,
-  instagram: customer.instagram_handle,
-  postalCode: customer.postal_code,
-  address: customer.address,
+  name: customer.full_name ?? '',
+  phone: customer.phone ?? '',
+  email: customer.email ?? '',
+  instagram: customer.instagram_handle ?? '',
+  birthDate: customer.birth_date ?? '',
+  postalCode: customer.postal_code ?? '',
+  address: customer.address ?? '',
 
   totalPurchases: 0,
   totalPaid: 0,
@@ -1409,60 +1414,140 @@ export function ERPProvider({ children }) {
       };
     }
   };
-  const addCustomer = async (payload) => {
-    if (!payload.name.trim() || !payload.phone.trim()) {
-      return {
-        ok: false,
-        message: 'نام و شماره تماس مشتری الزامی است.',
-      };
+ 
+  const validateCustomerForm = (
+    payload,
+    ignoredCustomerId = null,
+  ) => {
+    const name = (payload.name ?? '').trim();
+    const phone = (payload.phone ?? '').trim();
+    const email = (payload.email ?? '').trim();
+    const instagram = (payload.instagram ?? '').trim();
+  
+    if (!name) {
+      return 'نام مشتری الزامی است.';
+    }
+  
+    if (!phone && !email && !instagram) {
+      return (
+        'حداقل یکی از شماره تلفن، ایمیل ' +
+        'یا اینستاگرام باید وارد شود.'
+      );
     }
   
     if (
+      phone &&
       data.customers.some(
-        (customer) => customer.phone === payload.phone.trim(),
+        (customer) =>
+          Number(customer.id) !== Number(ignoredCustomerId) &&
+          customer.phone === phone,
       )
     ) {
+      return 'مشتری دیگری با این شماره تماس وجود دارد.';
+    }
+  
+    return null;
+  };
+  
+  const addCustomer = async (payload) => {
+    const validationError = validateCustomerForm(payload);
+  
+    if (validationError) {
       return {
         ok: false,
-        message: 'مشتری دیگری با این شماره تماس وجود دارد.',
+        message: validationError,
       };
     }
   
     try {
       const apiCustomer = await createCustomer(payload);
-  
-      const customer = {
-        id: Number(apiCustomer.id),
-      
-        name: apiCustomer.full_name,
-        phone: apiCustomer.phone,
-        instagram: apiCustomer.instagram_handle,
-        postalCode: apiCustomer.postal_code,
-        address: apiCustomer.address,
-      
-        totalPurchases: 0,
-        totalPaid: 0,
-        debt: 0,
-      };
+      const customer = mapCustomerFromApi(apiCustomer);
   
       setData((prev) => ({
         ...prev,
-        customers: [customer, ...prev.customers],
+        customers: [
+          customer,
+          ...prev.customers,
+        ],
       }));
   
       return {
         ok: true,
         message: 'مشتری جدید با موفقیت ثبت شد.',
+        customerId: customer.id,
       };
     } catch (error) {
       console.error(
-        'Failed to create customer in Django API:',
+        'Failed to create customer:',
         error,
       );
   
       return {
         ok: false,
-        message: 'ثبت مشتری در سرور انجام نشد.',
+        message:
+          error.message ||
+          'ثبت مشتری در سرور انجام نشد.',
+      };
+    }
+  };
+  
+  const updateCustomer = async (customerId, payload) => {
+    const validationError = validateCustomerForm(
+      payload,
+      customerId,
+    );
+  
+    if (validationError) {
+      return {
+        ok: false,
+        message: validationError,
+      };
+    }
+  
+    try {
+      const apiCustomer = await updateCustomerApi(
+        customerId,
+        payload,
+      );
+  
+      const updatedCustomer = mapCustomerFromApi(
+        apiCustomer,
+      );
+  
+      setData((prev) => ({
+        ...prev,
+        customers: prev.customers.map((customer) =>
+          Number(customer.id) === Number(customerId)
+            ? {
+                ...customer,
+                ...updatedCustomer,
+  
+                // ویرایش اطلاعات تماس نباید
+                // آمار فروش مشتری را صفر کند.
+                totalPurchases: customer.totalPurchases,
+                totalPaid: customer.totalPaid,
+                debt: customer.debt,
+              }
+            : customer,
+        ),
+      }));
+  
+      return {
+        ok: true,
+        message: 'اطلاعات مشتری ویرایش شد.',
+        customerId: updatedCustomer.id,
+      };
+    } catch (error) {
+      console.error(
+        'Failed to update customer:',
+        error,
+      );
+  
+      return {
+        ok: false,
+        message:
+          error.message ||
+          'ویرایش مشتری انجام نشد.',
       };
     }
   };
@@ -3053,6 +3138,7 @@ const grossProfit =
   
     addProduct: withToast(addProduct),
     addCustomer: withToast(addCustomer),
+    updateCustomer: withToast(updateCustomer),
     addSupplier: withToast(addSupplier),
     addWarehouse: withToast(addWarehouse),
 

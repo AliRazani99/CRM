@@ -1429,7 +1429,27 @@ textarea {
   align-items: center;
   gap: 9px;
 }
+.product-name-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: right;
+  cursor: pointer;
+}
 
+.product-name-button:hover .product-cell strong,
+.product-name-button:focus-visible .product-cell strong {
+  color: var(--indigo-light);
+  text-decoration: underline;
+}
+
+.product-name-button:focus-visible {
+  outline: 2px solid var(--indigo-light);
+  outline-offset: 4px;
+}
 .product-avatar {
   width: 32px;
   height: 32px;

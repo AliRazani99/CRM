@@ -14,7 +14,7 @@ import {
 import {
   useERP,
 } from '../context/ERPContext';
-
+import { getProductBuyers } from '../api/products';
 import {
   useAuth,
 } from '../context/AuthContext';
@@ -63,7 +63,7 @@ const createBlankProduct = (
 });
 
 
-export default function InventoryPage() {
+export default function InventoryPage({ onNavigate }) {
   const {
     products,
     warehouses,
@@ -81,6 +81,9 @@ export default function InventoryPage() {
   const canManageInventory =
     user?.role_code ===
     ROLE.STORE_MANAGER;
+  const canViewBuyers =
+    user?.role_code === ROLE.STORE_MANAGER ||
+    user?.role_code === ROLE.SALES_MANAGER;
 
 
   const [search, setSearch] =
@@ -160,7 +163,47 @@ export default function InventoryPage() {
     transferSubmitting,
     setTransferSubmitting,
   ] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [productBuyers, setProductBuyers] = useState([]);
+  const [buyersLoading, setBuyersLoading] = useState(false);
+  const [buyersError, setBuyersError] = useState('');
 
+  const selectedProduct = products.find(
+    (product) => Number(product.id) === Number(selectedProductId),
+  );
+
+  useEffect(() => {
+    if (selectedProductId == null || !canViewBuyers) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    setProductBuyers([]);
+    setBuyersError('');
+    setBuyersLoading(true);
+
+    getProductBuyers(selectedProductId)
+      .then((response) => {
+        if (!cancelled) {
+          setProductBuyers(response.buyers || []);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setBuyersError(error.message || 'دریافت خریداران انجام نشد.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBuyersLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProductId, canViewBuyers]);
 
   useEffect(() => {
     setProductForm(
@@ -651,29 +694,23 @@ const sourceAvailable =
                         }
                       >
                         <td>
-                          <div className="product-cell">
-                            <div className="product-avatar">
-                              <Boxes
-                                size={
-                                  17
-                                }
-                              />
-                            </div>
+                          <button
+                            type="button"
+                            className="product-name-button"
+                            onClick={() => setSelectedProductId(product.id)}
+                            aria-label={`مشاهده جزئیات ${product.name}`}
+                          >
+                            <div className="product-cell">
+                              <div className="product-avatar">
+                                <Boxes size={17} />
+                              </div>
 
-                            <div>
-                              <strong>
-                                {
-                                  product.name
-                                }
-                              </strong>
-
-                              <span>
-                                {
-                                  product.brand
-                                }
-                              </span>
+                              <div>
+                                <strong>{product.name}</strong>
+                                <span>{product.brand}</span>
+                              </div>
                             </div>
-                          </div>
+                          </button>
                         </td>
 
                         <td className="mono accent-text">
@@ -1528,6 +1565,132 @@ const sourceAvailable =
           </div>
         </form>
       </Modal>
+      <Modal
+  open={selectedProductId != null}
+  onClose={() => setSelectedProductId(null)}
+  title={
+    selectedProduct
+      ? `خریداران ${selectedProduct.name}`
+      : 'جزئیات کالا'
+  }
+  subtitle={
+    selectedProduct
+      ? `کد SKU: ${selectedProduct.sku}`
+      : ''
+  }
+  width="900px"
+>
+  {selectedProduct && (
+    <div className="form-stack">
+      <div className="profile-kpis">
+        <div>
+          <span>موجودی کل</span>
+          <strong>{selectedProduct.totalOnHand ?? 0}</strong>
+        </div>
+
+        <div>
+          <span>قابل فروش</span>
+          <strong>{selectedProduct.available ?? 0}</strong>
+        </div>
+
+        <div>
+          <span>قیمت فروش فعلی</span>
+          <strong>
+            {formatToman(selectedProduct.priceIRR)}
+          </strong>
+        </div>
+
+        {canViewBuyers && !buyersLoading && !buyersError && (
+          <div>
+            <span>تعداد خریداران</span>
+            <strong>{productBuyers.length}</strong>
+          </div>
+        )}
+      </div>
+
+      {!canViewBuyers ? (
+        <p className="muted-text">
+          نمایش اطلاعات خریداران فقط برای مدیر فروشگاه
+          و مدیر فروش مجاز است.
+        </p>
+      ) : buyersLoading ? (
+        <p className="muted-text" role="status">
+          در حال دریافت خریداران...
+        </p>
+      ) : buyersError ? (
+        <p className="danger-text" role="alert">
+          {buyersError}
+        </p>
+      ) : productBuyers.length === 0 ? (
+        <p className="muted-text">
+          هنوز خریدی برای این محصول ثبت نشده است.
+        </p>
+      ) : (
+        <>
+          <p className="muted-text">
+            {productBuyers.length} مشتری،{' '}
+            {productBuyers.reduce(
+              (sum, buyer) => sum + buyer.total_quantity,
+              0,
+            )}{' '}
+            عدد خریداری‌شده
+          </p>
+
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>مشتری</th>
+                  <th>شماره تماس</th>
+                  <th>تعداد فاکتور</th>
+                  <th>تعداد کالا</th>
+                  <th>مبلغ این محصول</th>
+                  <th>آخرین خرید</th>
+                  <th>جزئیات</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {productBuyers.map((buyer) => (
+                  <tr key={buyer.customer_id}>
+                    <td>{buyer.customer_name}</td>
+                    <td dir="ltr">{buyer.phone || '—'}</td>
+                    <td>{buyer.invoice_count}</td>
+                    <td>{buyer.total_quantity}</td>
+
+                    <td>
+                      {formatToman(
+                        Number(buyer.total_amount_irr) / 10,
+                      )}
+                    </td>
+
+                    <td>
+                      {formatDate(buyer.last_purchase_date)}
+                    </td>
+
+                    <td>
+                      <button
+                        type="button"
+                        className="button small secondary"
+                        onClick={() =>
+                          onNavigate?.('customers', {
+                            customerId: buyer.customer_id,
+                          })
+                        }
+                      >
+                        مشاهده مشتری
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  )}
+</Modal>
     </div>
   );
 }

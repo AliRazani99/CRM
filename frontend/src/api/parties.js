@@ -10,32 +10,34 @@ export function getCustomers() {
 }
 
 
-export function createCustomer(
-  customer,
-) {
-  return apiRequest(
-    '/customers/',
-    {
-      method: 'POST',
+function customerToApiPayload(customer) {
+  return {
+    full_name: customer.name.trim(),
+    phone: (customer.phone ?? '').trim(),
+    email: (customer.email ?? '').trim(),
+    instagram_handle: (customer.instagram ?? '').trim(),
+    birth_date: customer.birthDate || null,
+    postal_code: (customer.postalCode ?? '').trim(),
+    address: (customer.address ?? '').trim(),
+  };
+}
 
-      body: JSON.stringify({
-        full_name:
-          customer.name.trim(),
+export function createCustomer(customer) {
+  return apiRequest('/customers/', {
+    method: 'POST',
+    body: JSON.stringify(
+      customerToApiPayload(customer),
+    ),
+  });
+}
 
-        phone:
-          customer.phone.trim(),
-
-        instagram_handle:
-          customer.instagram.trim(),
-
-        postal_code:
-          customer.postalCode.trim(),
-
-        address:
-          customer.address.trim(),
-      }),
-    },
-  );
+export function updateCustomer(customerId, customer) {
+  return apiRequest(`/customers/${customerId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(
+      customerToApiPayload(customer),
+    ),
+  });
 }
 
 
