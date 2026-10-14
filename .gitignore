@@ -24,3 +24,7 @@ Thumbs.db
 *.log
 
 package-lock.json
+
+*.tar.gz
+backend.tar.gz
+dist.tar.gz
