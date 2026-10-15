@@ -68,6 +68,7 @@ function createLine(products) {
 
 export default function PurchasesPage({
   onNavigate,
+  navigationRequest,
 }) {
   const {
     products,
@@ -77,6 +78,21 @@ export default function PurchasesPage({
     financialAccounts = [],
     recordPurchase,
   } = useERP();
+
+  const [historyQuery, setHistoryQuery] = useState(
+    navigationRequest?.purchaseId ? String(navigationRequest.purchaseId) : ''
+  );
+  useEffect(() => {
+    if (navigationRequest?.purchaseId != null) {
+      setHistoryQuery(String(navigationRequest.purchaseId));
+    }
+  }, [navigationRequest]);
+  const visiblePurchases = purchases.filter((purchase) =>
+    !historyQuery.trim() ||
+    String(purchase.id).toLowerCase().includes(historyQuery.trim().toLowerCase()) ||
+    String(purchase.backendId).includes(historyQuery.trim()) ||
+    String(purchase.supplierName).toLowerCase().includes(historyQuery.trim().toLowerCase())
+  );
 
   const cadAccounts =
     financialAccounts.filter(
@@ -1090,9 +1106,16 @@ export default function PurchasesPage({
           className="side-panel"
         >
 
+          <input
+            aria-label="جست‌وجو در سوابق خرید"
+            placeholder="جست‌وجو با شماره خرید یا تأمین‌کننده"
+            value={historyQuery}
+            onChange={(event) => setHistoryQuery(event.target.value)}
+            style={{ marginBottom: 12 }}
+          />
           <div className="purchase-history">
 
-            {purchases.map(
+            {visiblePurchases.map(
               (purchase) => (
                 <article
                   className="purchase-card"

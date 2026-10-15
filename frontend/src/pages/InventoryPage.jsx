@@ -87,7 +87,13 @@ export default function InventoryPage({ onNavigate, navigationRequest }) {
 
 
   const [search, setSearch] =
-    useState('');
+    useState(navigationRequest?.search ?? '');
+
+  useEffect(() => {
+    if (typeof navigationRequest?.search === 'string') {
+      setSearch(navigationRequest.search);
+    }
+  }, [navigationRequest]);
 
   const [
     statusFilter,

@@ -34,7 +34,7 @@ export default function MainLayout({ activePage, onNavigate, children }) {
         onToggle={() => setCollapsed((value) => !value)}
       />
       <div className="app-main">
-        <Topbar title={title} onReset={handleReset} />
+        <Topbar title={title} onReset={handleReset} onNavigate={onNavigate} />
         <main className="page-container">{children}</main>
       </div>
     </div>

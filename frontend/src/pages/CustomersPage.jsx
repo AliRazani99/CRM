@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CreditCard, Search, UserPlus, UsersRound } from 'lucide-react';
 import { useERP } from '../context/ERPContext';
 import { Field, FormMessage, Modal, PageHeader, Panel } from '../components/UI';
@@ -39,6 +39,9 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
   const [customerResult, setCustomerResult] = useState(null);
   const [settleResult, setSettleResult] = useState(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState(navPayload?.customerId ?? customers[0]?.id ?? null);
+  useEffect(() => {
+    if (navPayload?.customerId != null) setSelectedCustomerId(Number(navPayload.customerId));
+  }, [navPayload]);
 
   const [dateFrom, setDateFrom] = useState('');
   const [minPurchase, setMinPurchase] = useState('');
@@ -371,6 +374,30 @@ export default function CustomersPage({ sale: navPayload, onNavigate } = {}) {
                               مشاهده
                             </button>
                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+              <Panel title="اقلام خریداری‌شده" subtitle="نام کالا و تعداد خرید در هر فاکتور؛ مستقل از محاسبه سودآوری تاریخی">
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead><tr><th>تاریخ</th><th>فاکتور</th><th>کالا</th><th>تعداد</th><th>مبلغ ردیف</th></tr></thead>
+                    <tbody>
+                      {customerSales.flatMap((invoice) =>
+                        (invoice.items || []).map((item) => ({ invoice, item })),
+                      ).length === 0 ? (
+                        <tr><td colSpan="5" className="empty-cell">هنوز اقلام خرید این مشتری در سیستم ثبت نشده‌اند.</td></tr>
+                      ) : customerSales.flatMap((invoice) =>
+                        (invoice.items || []).map((item) => ({ invoice, item })),
+                      ).map(({ invoice, item }) => (
+                        <tr key={`${invoice.backendId || invoice.id}-${item.id || item.productId}`}>
+                          <td>{formatDate(invoice.date)}</td>
+                          <td className="mono accent-text">{invoice.id}</td>
+                          <td>{item.productName || 'کالای نامشخص'}</td>
+                          <td>{item.qty}</td>
+                          <td>{formatToman(item.lineTotal)}</td>
                         </tr>
                       ))}
                     </tbody>

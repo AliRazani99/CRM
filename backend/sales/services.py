@@ -272,7 +272,7 @@ def create_sale_with_items_and_payment(
             cad_rate_irr_per_cad
         )
 
-    if cad_rate_irr_per_cad <= 0:
+    if cad_rate_irr_per_cad is not None and cad_rate_irr_per_cad <= 0:
         raise ValidationError(
             "CAD rate must be greater than zero."
         )
