@@ -38,6 +38,7 @@ import {
   formatToman,
 } from '../utils/formatters';
 
+import '../warehouse-details.css';
 
 const createBlankProduct = (
   warehouses = [],
@@ -63,7 +64,7 @@ const createBlankProduct = (
 });
 
 
-export default function InventoryPage({ onNavigate }) {
+export default function InventoryPage({ onNavigate, navigationRequest }) {
   const {
     products,
     warehouses,
@@ -86,8 +87,21 @@ export default function InventoryPage({ onNavigate }) {
     user?.role_code === ROLE.SALES_MANAGER;
 
 
-  const [search, setSearch] =
+  // Warehouse details state
+  const [selectedWarehouseId, setSelectedWarehouseId] =
+    useState(null);
+
+  const [warehouseProductQuery, setWarehouseProductQuery] =
     useState('');
+
+  const [search, setSearch] =
+    useState(navigationRequest?.search ?? '');
+
+  useEffect(() => {
+    if (typeof navigationRequest?.search === 'string') {
+      setSearch(navigationRequest.search);
+    }
+  }, [navigationRequest]);
 
   const [
     statusFilter,
@@ -153,6 +167,30 @@ export default function InventoryPage({ onNavigate }) {
     transferResult,
     setTransferResult,
   ] = useState(null);
+
+  // ورود از عملیات اصلی «انتقال بین انبارها» مستقیماً فرم را باز می‌کند.
+  // مسیر عادی «کالاها و موجودی» همان صفحه موجودی قبلی است.
+  useEffect(() => {
+    if (navigationRequest?.openTransfer === false) {
+      setTransferModal(false);
+      return;
+    }
+
+    if (
+      navigationRequest?.openTransfer === true &&
+      canManageInventory &&
+      warehouses.length >= 2 &&
+      products.length > 0
+    ) {
+      setTransferResult(null);
+      setTransferModal(true);
+    }
+  }, [
+    navigationRequest,
+    canManageInventory,
+    warehouses.length,
+    products.length,
+  ]);
 
   const [
     productSubmitting,
@@ -395,6 +433,74 @@ export default function InventoryPage({ onNavigate }) {
     );
   };
   const warehouseSummaries = useMemo(() => { return warehouses.map( (warehouse) => { const rows = products.flatMap( (product) => ( product.inventories || [] ).filter( (inventory) => Number( inventory.warehouseId ) === Number( warehouse.id ), ), ); return { ...warehouse, productCount: rows.filter( (row) => row.qtyOnHand > 0 || row.qtyReserved > 0 ).length, totalOnHand: rows.reduce( (sum, row) => sum + Number( row.qtyOnHand ), 0, ), totalReserved: rows.reduce( (sum, row) => sum + Number( row.qtyReserved ), 0, ), totalAvailable: rows.reduce( (sum, row) => sum + Number( row.qtyAvailable ), 0, ), }; }, ); }, [ warehouses, products, ]);
+  // Warehouse details from existing API data
+  const selectedWarehouse = selectedWarehouseId == null
+    ? null
+    : warehouseSummaries.find(
+        (warehouse) =>
+          String(warehouse.id) ===
+          String(selectedWarehouseId),
+      ) || null;
+
+  const warehouseProducts = useMemo(() => {
+    if (selectedWarehouseId == null) return [];
+
+    return products
+      .map((product) => {
+        const inventory = (
+          product.inventories || []
+        ).find(
+          (row) =>
+            String(row.warehouseId) ===
+            String(selectedWarehouseId),
+        );
+
+        if (
+          !inventory ||
+          Number(inventory.qtyOnHand) <= 0
+        ) {
+          return null;
+        }
+
+        return {
+          id: product.id,
+          name: product.name,
+          sku: product.sku,
+          qtyOnHand:
+            Number(inventory.qtyOnHand) || 0,
+          qtyReserved:
+            Number(inventory.qtyReserved) || 0,
+          qtyAvailable:
+            Number(inventory.qtyAvailable) || 0,
+        };
+      })
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          a.name.localeCompare(b.name, 'fa')
+      );
+  }, [products, selectedWarehouseId]);
+
+  const visibleWarehouseProducts = useMemo(() => {
+    const query = warehouseProductQuery
+      .trim()
+      .toLocaleLowerCase();
+
+    if (!query) return warehouseProducts;
+
+    return warehouseProducts.filter(
+      (product) =>
+        `${product.name} ${product.sku ?? ''}`
+          .toLocaleLowerCase()
+          .includes(query),
+    );
+  }, [warehouseProducts, warehouseProductQuery]);
+
+  const openWarehouseDetails = (warehouseId) => {
+    setSelectedWarehouseId(warehouseId);
+    setWarehouseProductQuery('');
+  };
+
   const selectedTransferProduct =
   products.find(
     (product) =>
@@ -504,7 +610,7 @@ const sourceAvailable =
       )}
       <Panel
         title="فهرست انبارها"
-        subtitle="نمای کلی موجودی هر انبار"
+        subtitle="برای نمایش مشخصات و فهرست کالاها روی هر انبار کلیک کنید"
       >
         <div className="table-wrap">
 
@@ -529,14 +635,23 @@ const sourceAvailable =
                 (warehouse) => (
 
                   <tr
-                    key={warehouse.id}
-                  >
-
-                    <td>
-                      <strong>
-                        {warehouse.name}
-                      </strong>
-                    </td>
+  key={warehouse.id}
+  className="warehouse-summary-row"
+  onClick={() => openWarehouseDetails(warehouse.id)}
+>
+  <td>
+    <button
+      type="button"
+      className="warehouse-detail-link"
+      onClick={(event) => {
+        event.stopPropagation();
+        openWarehouseDetails(warehouse.id);
+      }}
+      aria-label={`مشاهده جزئیات انبار ${warehouse.name}`}
+    >
+      {warehouse.name}
+    </button>
+  </td>
 
                     <td>
                       {
@@ -987,6 +1102,138 @@ const sourceAvailable =
 
   </div>
 </Panel>
+      {/* Warehouse information and inventory details */}
+      <Modal
+        open={Boolean(selectedWarehouse)}
+        onClose={() => setSelectedWarehouseId(null)}
+        title={
+          selectedWarehouse
+            ? `جزئیات انبار ${selectedWarehouse.name}`
+            : 'جزئیات انبار'
+        }
+        subtitle="مشخصات انبار و موجودی کالاها به تفکیک تعداد"
+        width="900px"
+      >
+        {selectedWarehouse && (
+          <div className="warehouse-details">
+
+            <div className="warehouse-details-info">
+              <div>
+                <span>نام انبار</span>
+                <strong>{selectedWarehouse.name}</strong>
+              </div>
+
+              <div>
+                <span>آدرس / موقعیت</span>
+                <strong>
+                  {selectedWarehouse.location || 'ثبت نشده'}
+                </strong>
+              </div>
+
+              <div>
+                <span>تاریخ ثبت</span>
+                <strong>
+                  {selectedWarehouse.created_at
+                    ? formatDate(selectedWarehouse.created_at)
+                    : '—'}
+                </strong>
+              </div>
+            </div>
+
+            <div className="warehouse-details-totals">
+              <div>
+                <span>مدل کالای موجود</span>
+                <strong>
+                  {selectedWarehouse.productCount}
+                </strong>
+              </div>
+
+              <div>
+                <span>تعداد کل</span>
+                <strong>
+                  {selectedWarehouse.totalOnHand}
+                </strong>
+              </div>
+
+              <div>
+                <span>رزروشده</span>
+                <strong>
+                  {selectedWarehouse.totalReserved}
+                </strong>
+              </div>
+
+              <div>
+                <span>قابل فروش</span>
+                <strong>
+                  {selectedWarehouse.totalAvailable}
+                </strong>
+              </div>
+            </div>
+
+            <div className="warehouse-details-head">
+              <h3>کالاهای موجود در این انبار</h3>
+
+              <div className="search-box wide warehouse-details-search">
+                <Search size={16} />
+
+                <input
+                  value={warehouseProductQuery}
+                  onChange={(event) =>
+                    setWarehouseProductQuery(event.target.value)
+                  }
+                  placeholder="جست‌وجو با نام یا SKU کالا"
+                  aria-label="جست‌وجوی کالاهای این انبار"
+                />
+              </div>
+            </div>
+
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>کالا</th>
+                    <th>SKU</th>
+                    <th>موجودی کل</th>
+                    <th>رزروشده</th>
+                    <th>قابل فروش</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {visibleWarehouseProducts.length > 0 ? (
+                    visibleWarehouseProducts.map((product) => (
+                      <tr key={product.id}>
+                        <td>
+                          <strong>{product.name}</strong>
+                        </td>
+                        <td className="mono">
+                          {product.sku || '—'}
+                        </td>
+                        <td>{product.qtyOnHand}</td>
+                        <td>{product.qtyReserved}</td>
+                        <td>{product.qtyAvailable}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="empty-cell">
+                        {warehouseProducts.length === 0
+                          ? 'کالایی با موجودی مثبت در این انبار ثبت نشده است.'
+                          : 'کالایی مطابق جست‌وجو پیدا نشد.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="warehouse-details-note">
+              تعدادها از موجودی فعلی ثبت‌شده در سیستم خوانده می‌شوند.
+            </p>
+
+          </div>
+        )}
+      </Modal>
       <Modal
         open={warehouseModal}
         onClose={()=>setWarehouseModal(false)}

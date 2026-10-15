@@ -100,7 +100,11 @@ function ERPApp() {
     );
   
     setActivePage(pageId);
-    setSelectedData(payload);
+    setSelectedData(
+      payload && typeof payload === 'object'
+        ? { ...payload }
+        : payload
+    );
   
   };
 
@@ -125,6 +129,7 @@ function ERPApp() {
       <Page
       onNavigate={navigate}
       sale={selectedData}
+      navigationRequest={selectedData}
       />
     </MainLayout>
   );

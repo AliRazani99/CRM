@@ -5,6 +5,7 @@ import { useERP } from '../context/ERPContext';
 
 const pageTitles = {
   dashboard: 'داشبورد هوش تجاری',
+  users: 'کاربران و دسترسی‌ها',
   sales: 'فروش و صدور فاکتور',
   purchases: 'خرید و بهای تمام‌شده',
   inventory: 'مدیریت انبار و کالا',
@@ -33,7 +34,7 @@ export default function MainLayout({ activePage, onNavigate, children }) {
         onToggle={() => setCollapsed((value) => !value)}
       />
       <div className="app-main">
-        <Topbar title={title} onReset={handleReset} />
+        <Topbar title={title} onReset={handleReset} onNavigate={onNavigate} />
         <main className="page-container">{children}</main>
       </div>
     </div>

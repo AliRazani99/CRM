@@ -69,23 +69,6 @@ class CustomerSerializer(
             })
 
         return attrs
-    class Meta:
-        model = Customer
-
-        fields = [
-            "id",
-            "full_name",
-            "phone",
-            "instagram_handle",
-            "postal_code",
-            "address",
-            "created_at",
-        ]
-
-        read_only_fields = [
-            "id",
-            "created_at",
-        ]
 
 
 class SupplierSerializer(

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, Truck } from 'lucide-react';
 import { useERP } from '../context/ERPContext';
 import { Field, FormMessage, Modal, PageHeader, Panel } from '../components/UI';
@@ -6,13 +6,16 @@ import { formatCAD, formatDate, formatToman } from '../utils/formatters';
 
 const blankSupplier = { name: '', country: '', phone: '', email: '' };
 
-export default function SuppliersPage() {
+export default function SuppliersPage({ navigationRequest } = {}) {
   const { suppliers, purchases, addSupplier } = useERP();
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(blankSupplier);
   const [result, setResult] = useState(null);
-  const [selectedSupplierId, setSelectedSupplierId] = useState(suppliers[0]?.id ?? null);
+  const [selectedSupplierId, setSelectedSupplierId] = useState(navigationRequest?.supplierId ?? suppliers[0]?.id ?? null);
+  useEffect(() => {
+    if (navigationRequest?.supplierId != null) setSelectedSupplierId(Number(navigationRequest.supplierId));
+  }, [navigationRequest]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -109,10 +112,10 @@ export default function SuppliersPage() {
                         <tr key={purchase.id}>
                           <td className="mono accent-text">{purchase.id}</td>
                           <td>{formatDate(purchase.date)}</td>
-                          <td>{purchase.warehouse === 'w1' ? 'انبار ۱' : 'انبار ۲'}</td>
+                          <td>{purchase.warehouseName || '—'}</td>
                           <td>{formatCAD(purchase.subtotalCAD)}</td>
-                          <td>{formatToman(purchase.extraCostsIRR)}</td>
-                          <td>{formatToman(purchase.totalLandedIRR)}</td>
+                          <td>{formatToman(purchase.extraCostsToman)}</td>
+                          <td>{formatCAD(purchase.totalLandedCAD)}</td>
                         </tr>
                       ))}
                     </tbody>

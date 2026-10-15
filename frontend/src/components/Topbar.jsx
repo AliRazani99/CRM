@@ -6,6 +6,8 @@ import {
   UserRound,
 } from 'lucide-react';
 
+import GlobalSearch from './GlobalSearch';
+
 import {
   useERP,
 } from '../context/ERPContext';
@@ -27,6 +29,7 @@ import {
 export default function Topbar({
   title,
   onReset,
+  onNavigate,
 }) {
   const {
     accounts,
@@ -68,16 +71,7 @@ export default function Topbar({
         </strong>
       </div>
 
-      <div className="topbar-center">
-        <Search size={16} />
-
-        <input
-          placeholder="جست‌وجوی سریع..."
-          aria-label="جست‌وجوی سریع"
-        />
-
-        <kbd>⌘ K</kbd>
-      </div>
+      <GlobalSearch onNavigate={onNavigate} />
 
       <div className="topbar-actions">
         {isStoreManager && (
