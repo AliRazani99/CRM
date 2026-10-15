@@ -5,6 +5,7 @@ import { useERP } from '../context/ERPContext';
 
 const pageTitles = {
   dashboard: 'داشبورد هوش تجاری',
+  users: 'کاربران و دسترسی‌ها',
   sales: 'فروش و صدور فاکتور',
   purchases: 'خرید و بهای تمام‌شده',
   inventory: 'مدیریت انبار و کالا',

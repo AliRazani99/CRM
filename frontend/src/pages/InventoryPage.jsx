@@ -63,7 +63,7 @@ const createBlankProduct = (
 });
 
 
-export default function InventoryPage({ onNavigate }) {
+export default function InventoryPage({ onNavigate, navigationRequest }) {
   const {
     products,
     warehouses,
@@ -153,6 +153,30 @@ export default function InventoryPage({ onNavigate }) {
     transferResult,
     setTransferResult,
   ] = useState(null);
+
+  // ورود از عملیات اصلی «انتقال بین انبارها» مستقیماً فرم را باز می‌کند.
+  // مسیر عادی «کالاها و موجودی» همان صفحه موجودی قبلی است.
+  useEffect(() => {
+    if (navigationRequest?.openTransfer === false) {
+      setTransferModal(false);
+      return;
+    }
+
+    if (
+      navigationRequest?.openTransfer === true &&
+      canManageInventory &&
+      warehouses.length >= 2 &&
+      products.length > 0
+    ) {
+      setTransferResult(null);
+      setTransferModal(true);
+    }
+  }, [
+    navigationRequest,
+    canManageInventory,
+    warehouses.length,
+    products.length,
+  ]);
 
   const [
     productSubmitting,
