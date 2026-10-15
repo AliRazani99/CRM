@@ -1,0 +1,111 @@
+
+/* NEXUS ERP - Warehouse details */
+
+.warehouse-summary-row {
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.warehouse-summary-row:hover,
+.warehouse-summary-row:focus-within {
+  background: rgba(99, 102, 241, 0.11);
+}
+
+.warehouse-detail-link {
+  width: auto;
+  padding: 3px 0;
+  border: none;
+  background: none;
+  color: var(--indigo-light, #818cf8);
+  font: inherit;
+  font-weight: 700;
+  text-align: right;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+.warehouse-detail-link:hover,
+.warehouse-detail-link:focus-visible {
+  color: #c7d2fe;
+}
+
+.warehouse-details {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.warehouse-details-info,
+.warehouse-details-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.warehouse-details-totals {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.warehouse-details-info > div,
+.warehouse-details-totals > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--border-soft, rgba(71,85,105,.28));
+  background: var(--surface-soft, rgba(30,41,59,.5));
+  border-radius: 12px;
+}
+
+.warehouse-details-info span,
+.warehouse-details-totals span {
+  color: var(--muted, #94a3b8);
+  font-size: 12px;
+}
+
+.warehouse-details-info strong,
+.warehouse-details-totals strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.warehouse-details-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.warehouse-details-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.warehouse-details-search {
+  width: min(100%, 340px);
+}
+
+.warehouse-details-note {
+  margin: 0;
+  color: var(--muted, #94a3b8);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .warehouse-details-info {
+    grid-template-columns: 1fr;
+  }
+
+  .warehouse-details-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .warehouse-details-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .warehouse-details-search {
+    width: 100%;
+  }
+}
