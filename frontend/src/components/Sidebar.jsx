@@ -125,7 +125,7 @@ export default function Sidebar({
 
       <nav className="sidebar-nav workflow-nav" aria-label="ناوبری ERP">
         {!collapsed && (
-          <div className="workflow-section-heading">۴ فرآیند اصلی</div>
+          <div className="workflow-section-heading">مرکز عملیات</div>
         )}
 
         {availableWorkflows.map((workflow) => {
@@ -210,7 +210,7 @@ export default function Sidebar({
         {(availableManagerItems.length > 0 || showReadOnlyInventory) && (
           <div className="workflow-utilities nav-group">
             {!collapsed && (
-              <span className="nav-group-label">مدیریت و دسترسی‌های تکمیلی</span>
+              <span className="nav-group-label">مدیریت و گزارش ها</span>
             )}
             {showReadOnlyInventory && (
               <button
